@@ -1,0 +1,133 @@
+import weakref
+from typing import Callable, Generic, TypeVar, cast
+import gi
+
+gi.require_version("Gtk", "4.0")
+gi.require_version("GObject", "2.0")
+gi.require_version("GLib", "2.0")
+from gi.repository import GLib, GObject  # type: ignore # noqa: E402
+
+T = TypeVar("T")
+R = TypeVar("R")
+
+
+class _StateData(GObject.GObject, Generic[T]):
+    """Internal GObject to hold the actual state value."""
+
+    value: T = cast(T, GObject.Property(type=object))
+
+    def __init__(self, initial_value: T):
+        super().__init__()
+        self.value = initial_value
+
+
+class State(Generic[T]):
+    """A reactive state container that uses composition instead of inheritance."""
+
+    def __init__(self, value: T):
+        self._gobject: _StateData[T] = _StateData(value)
+        self._connections: weakref.WeakSet[Connection] = weakref.WeakSet()
+        self._derived_states: weakref.WeakSet["State"] = weakref.WeakSet()
+
+    @property
+    def value(self) -> T:
+        """Get the current state value."""
+        return self._gobject.value
+
+    def set(self, value: T) -> None:
+        """Set the state value and notify listeners."""
+
+        @GLib.idle_add
+        def _():
+            if self._gobject.value != value:
+                self._gobject.value = value
+
+    def update(self, fn: Callable[[T], T]) -> None:
+        """Update the state value using a function."""
+        self.set(fn(self.value))
+
+    def map(self, mapper: Callable[[T], R]) -> "State[R]":
+        """Create a new derived state that transforms this state's value."""
+        # Create the derived state with initial transformed value
+        derived = State(mapper(self.value))
+
+        # Connect to this state's changes
+        def on_change(*args):
+            derived.set(mapper(self.value))
+
+        connection_id = self._gobject.connect("notify::value", on_change)
+        connection = Connection(self._gobject, connection_id)
+
+        # Track the connection in both states
+        self._connections.add(connection)
+        derived._connections.add(connection)
+
+        # Track the derived state for cleanup
+        self._derived_states.add(derived)
+
+        return derived
+
+    def bind(
+        self,
+        target_object: GObject.Object,
+        target_property: str,
+        two_way: bool = False,
+    ) -> GObject.Binding:
+        """Bind this state's value to a target object's property."""
+        flags = GObject.BindingFlags.SYNC_CREATE
+        if two_way:
+            flags |= GObject.BindingFlags.BIDIRECTIONAL
+        return self._gobject.bind_property(
+            "value",
+            target_object,
+            target_property,
+            flags,
+            lambda binding, value: value,
+            lambda binding, value: value,
+        )
+
+    def connect(self, signal_name: str, callback: Callable) -> int:
+        """Connect to the state's signals (delegates to internal GObject)."""
+        return self._gobject.connect(signal_name, callback)
+
+    def disconnect(self, connection_id: int) -> None:
+        """Disconnect a signal connection."""
+        self._gobject.disconnect(connection_id)
+
+    def cleanup(self):
+        """Cleanup all connections and references."""
+        # Cleanup all derived states first
+        for derived_state in list(self._derived_states):
+            if derived_state is not None:
+                derived_state.cleanup()
+        self._derived_states.clear()
+
+        # Disconnect any remaining connections
+        for connection in list(self._connections):
+            if connection.is_valid():
+                connection.disconnect()
+        self._connections.clear()
+
+    def __repr__(self) -> str:
+        return f"State({self.value!r})"
+
+
+class Connection:
+    """Wrapper for GObject connections that can be managed and cleaned up."""
+
+    def __init__(self, obj: GObject.Object, connection_id: int):
+        self._obj_ref = weakref.ref(obj)
+        self._connection_id = connection_id
+        self._disconnected = False
+
+    def disconnect(self):
+        """Disconnect the signal connection."""
+        if not self._disconnected:
+            obj = self._obj_ref()
+            if obj is not None:
+                obj.disconnect(self._connection_id)
+            self._disconnected = True
+
+    def is_valid(self) -> bool:
+        """Check if the connection is still valid."""
+        return not self._disconnected and self._obj_ref() is not None
