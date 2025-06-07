@@ -1,11 +1,12 @@
 import asyncio
 import weakref
 from collections.abc import Awaitable
-from typing import Callable, Final, Generic, TypeVar
+from typing import Any, Callable, Final, Generic, TypeVar, overload
 import gi
 
-from reactivegtk.state import State, Connection
-from reactivegtk.topic import Topic
+from reactivegtk.state import State
+from reactivegtk.connection import Connection
+from reactivegtk.signal import Signal
 from reactivegtk.effect import Effect
 
 gi.require_version("Gtk", "4.0")
@@ -124,26 +125,78 @@ def effect(
 
 
 def watch(
-    widget: Gtk.Widget, signal: tuple[GObject.Object, str] | State, init: bool = False
-) -> Callable[[Callable[[], T]], Callable[[], T]]:
+    widget: Gtk.Widget, state: State[T], init: bool = False
+) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
     """Bind a callback to signals with proper lifecycle management."""
 
-    def decorator(func: Callable[[], T]) -> Callable[[], T]:
+    def decorator(func: Callable[[T], Any]) -> Callable[[T], Any]:
         """Decorator to create a callback that can be called with the object."""
         lifecycle_manager = LifecycleManager.get_instance(widget)
 
         if init:
-            func()
+            func(state.value)
 
-        if isinstance(signal, State):
-            obj, signal_name = signal._gobject, "notify::value"
-        else:
-            obj, signal_name = signal
-
-        lifecycle_manager.add_connection(obj, signal_name, lambda *_: func())
+        lifecycle_manager.add_connection_ref(state.watch(func))
         return func
 
     return decorator
+
+
+@overload
+def subscribe(
+    widget: Gtk.Widget, signal: Signal[T], /
+) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+
+
+@overload
+def subscribe(
+    widget: Gtk.Widget, obj: GObject.Object, signal_name: str, /
+) -> Callable[[Callable[[tuple], None]], Callable[[tuple], None]]: ...
+
+
+def subscribe(
+    widget: Gtk.Widget, *args
+) -> (
+    Callable[[Callable[[T], None]], Callable[[T], None]]
+    | Callable[[Callable[[tuple], None]], Callable[[tuple], None]]
+):
+    """Subscribe to a topic with proper lifecycle management."""
+
+    match args:
+        case (Signal(),):
+            signal = args[0]
+
+            def signal_decorator(func: Callable[[T], None]) -> Callable[[T], None]:
+                """Decorator to create a subscription that can be called with the object."""
+                lifecycle_manager = LifecycleManager.get_instance(widget)
+                connection = signal.subscribe(func)
+
+                def on_message(obj, message):
+                    func(message)
+
+                connection_id = signal._object.connect("message", on_message)
+                connection = Connection(signal._object, connection_id)
+                signal._connections.add(connection)
+                lifecycle_manager.add_connection_ref(connection)
+                return func
+
+            return signal_decorator
+
+        case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(signal_name, str):
+
+            def obj_name_decorator(func: Callable[[tuple], None]) -> Callable[[tuple], None]:
+                """Decorator to create a subscription that can be called with the object."""
+                lifecycle_manager = LifecycleManager.get_instance(widget)
+                signal_instance = Signal.from_obj_and_name(obj, signal_name)
+                connection = signal_instance.subscribe(func)
+                signal_instance._connections.add(connection)
+                lifecycle_manager.add_connection_ref(connection)
+                return func
+
+            return obj_name_decorator
+
+        case _:
+            raise TypeError("Invalid signal type. Must be Signal or (GObject.Object, str) tuple.")
 
 
 WidgetT = TypeVar("WidgetT", bound=Gtk.Widget, covariant=True)
@@ -155,35 +208,32 @@ class WidgetLifecycle(Generic[WidgetT]):
         self.widget: Final[WidgetT] = widget
 
     def watch(
-        self, signal: tuple[GObject.Object, str] | State, init: bool = False
-    ) -> Callable[[Callable[[], T]], Callable[[], T]]:
-        """Create a watcher that can respond to GTK signals."""
+        self, state: State[T], init: bool = False
+    ) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
+        """Create a watcher that can respond to State changes."""
 
-        def decorator(fn: Callable[[], T]) -> Callable[[], T]:
-            return watch(self.widget, signal, init=init)(fn)
+        return watch(self.widget, state, init)
 
-        return decorator
+    @overload
+    def subscribe(
+        self, signal: Signal[T], /
+    ) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+    @overload
+    def subscribe(
+        self, obj: GObject.Object, signal_name: str, /
+    ) -> Callable[[Callable[[tuple], None]], Callable[[tuple], None]]: ...
 
     def subscribe(
-        self, topic: Topic[T]
-    ) -> Callable[[Callable[[T], None]], Callable[[T], None]]:
-        """Subscribe to a topic with proper lifecycle management."""
-
-        def decorator(fn: Callable[[T], None]) -> Callable[[T], None]:
-            lifecycle_manager = LifecycleManager.get_instance(self.widget)
-            connection = topic.subscribe(fn)
-            lifecycle_manager.add_connection_ref(connection)
-            return fn
-
-        return decorator
+        self, *args
+    ) -> (
+        Callable[[Callable[[T], None]], Callable[[T], None]]
+        | Callable[[Callable[[tuple], None]], Callable[[tuple], None]]
+    ):
+        """Subscribe to a signal with proper lifecycle management."""
+        return subscribe(self.widget, *args)
 
     def effect[T](
         self, *signals: tuple[GObject.Object, str] | State, event_loop: asyncio.AbstractEventLoop
     ) -> Callable[[Callable[[], Awaitable[T]]], Effect[T]]:
         """Create and launch an effect that can respond to GTK signals."""
-
-        def decorator(fn: Callable[[], Awaitable[T]]) -> Effect[T]:
-            side_effect = effect(self.widget, event_loop, *signals)(fn)
-            return side_effect
-
-        return decorator
+        return effect(self.widget, event_loop, *signals)

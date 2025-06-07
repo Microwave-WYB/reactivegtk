@@ -39,15 +39,11 @@ def LiveDisplay(text: State[str]) -> Gtk.Widget:
         width_request=300,
         height_request=100,
     )
-    binder = WidgetLifecycle(box)
 
     @into(box.set_child)
     def _():
         label = Gtk.Label(css_classes=["title-1"])
-
-        @binder.watch(text, init=True)
-        def _():
-            label.set_label(text.value)
+        text.bind(label, "label")
 
         return label
 

@@ -2,12 +2,15 @@ import weakref
 from typing import Callable, Generic, TypeVar, cast
 import gi
 
+from reactivegtk.connection import Connection
+
 gi.require_version("Gtk", "4.0")
 gi.require_version("GObject", "2.0")
 gi.require_version("GLib", "2.0")
 from gi.repository import GLib, GObject  # type: ignore # noqa: E402
 
 T = TypeVar("T")
+U = TypeVar("U")
 R = TypeVar("R")
 
 
@@ -34,22 +37,10 @@ class State(Generic[T]):
         """Get the current state value."""
         return self._gobject.value
 
-    def set(self, value: T) -> None:
-        """Set the state value and notify listeners."""
-
-        @GLib.idle_add
-        def _():
-            if self._gobject.value != value:
-                self._gobject.value = value
-
-    def update(self, fn: Callable[[T], T]) -> None:
-        """Update the state value using a function."""
-        self.set(fn(self.value))
-
     def map(self, mapper: Callable[[T], R]) -> "State[R]":
         """Create a new derived state that transforms this state's value."""
         # Create the derived state with initial transformed value
-        derived = State(mapper(self.value))
+        derived = MutableState(mapper(self.value))
 
         # Connect to this state's changes
         def on_change(*args):
@@ -86,9 +77,20 @@ class State(Generic[T]):
             lambda binding, value: value,
         )
 
-    def connect(self, signal_name: str, callback: Callable) -> int:
-        """Connect to the state's signals (delegates to internal GObject)."""
-        return self._gobject.connect(signal_name, callback)
+    def watch(
+        self,
+        callback: Callable[[T], None],
+        init: bool = False,
+    ) -> "Connection":
+        """Subscribe to changes in this state."""
+        if init:
+            # Call the callback immediately with the current value
+            callback(self.value)
+
+        connection_id = self._gobject.connect("notify::value", lambda *_: callback(self.value))
+        connection = Connection(self._gobject, connection_id)
+        self._connections.add(connection)
+        return connection
 
     def disconnect(self, connection_id: int) -> None:
         """Disconnect a signal connection."""
@@ -112,22 +114,18 @@ class State(Generic[T]):
         return f"State({self.value!r})"
 
 
-class Connection:
-    """Wrapper for GObject connections that can be managed and cleaned up."""
+class MutableState(State[T]):
+    def set(self, value: T) -> None:
+        """Set the state value and notify listeners."""
 
-    def __init__(self, obj: GObject.Object, connection_id: int):
-        self._obj_ref = weakref.ref(obj)
-        self._connection_id = connection_id
-        self._disconnected = False
+        @GLib.idle_add
+        def _():
+            if self._gobject.value != value:
+                self._gobject.value = value
 
-    def disconnect(self):
-        """Disconnect the signal connection."""
-        if not self._disconnected:
-            obj = self._obj_ref()
-            if obj is not None:
-                obj.disconnect(self._connection_id)
-            self._disconnected = True
+    def update(self, fn: Callable[[T], T]) -> None:
+        """Update the state value using a function."""
+        self.set(fn(self.value))
 
-    def is_valid(self) -> bool:
-        """Check if the connection is still valid."""
-        return not self._disconnected and self._obj_ref() is not None
+
+

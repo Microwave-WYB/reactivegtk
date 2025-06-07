@@ -1,8 +1,10 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Callable
+
 import gi
-from reactivegtk import State, Topic, WidgetLifecycle, into, bind_sequence, Preview
+
+from reactivegtk import MutableState, Preview, State, WidgetLifecycle, bind_sequence, into
 
 gi.require_versions(
     {
@@ -11,7 +13,7 @@ gi.require_versions(
         "Gdk": "4.0",
     }
 )
-from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
+from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -27,12 +29,7 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
     @into(row.add_prefix)
     def _():
         checkbox = Gtk.CheckButton()
-
-        task.done.bind(checkbox, "active")
-
-        @lifecycle.watch((checkbox, "toggled"))
-        def _():
-            task.done.set(checkbox.get_active())
+        task.done.bind(checkbox, "active", two_way=True)
 
         return checkbox
 
@@ -45,8 +42,8 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
             tooltip_text="Remove task",
         )
 
-        @lifecycle.watch((remove_button, "clicked"))
-        def _():
+        @lifecycle.subscribe(remove_button, "clicked")
+        def _(_):
             on_remove(task)
 
         return remove_button
@@ -55,28 +52,60 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
 
 
 def TaskList(
-    tasks: State[Sequence[TaskModel]], on_remove: Callable[[TaskModel], None]
+    tasks: State[Sequence[TaskModel]],
+    on_remove: Callable[[TaskModel], None],
 ) -> Gtk.Widget:
     clamp = Adw.Clamp(maximum_size=800, tightening_threshold=400)
+    lifecycle = WidgetLifecycle(clamp)
 
-    @into(clamp.set_child)
-    def _():
-        listbox = Gtk.ListBox(
-            width_request=300,
-            selection_mode=Gtk.SelectionMode.NONE,
-            css_classes=["boxed-list"],
-        )
+    listbox = Gtk.ListBox(
+        width_request=300,
+        selection_mode=Gtk.SelectionMode.NONE,
+        css_classes=["boxed-list"],
+    )
 
-        @bind_sequence(listbox, tasks, key_fn=lambda t: t.title.value)
-        def item_factory(task: TaskModel) -> Adw.ActionRow:
-            return TaskWidget(task, on_remove)
+    @bind_sequence(listbox, tasks)
+    def _(task: TaskModel) -> Adw.ActionRow:
+        return TaskWidget(task, on_remove=on_remove)
 
-        return listbox
+    @lifecycle.watch(tasks, init=True)
+    def _(value: Sequence[TaskModel]):
+        if not value:
+            clamp.set_child(None)
+        else:
+            clamp.set_child(listbox)
 
     return clamp
 
 
-def TodoApp() -> Gtk.Widget:
+class TodoViewModel:
+    def __init__(self):
+        self.tasks = MutableState[Sequence[TaskModel]]([])
+        self.entry_text = MutableState("")
+        self.stats = MutableState[tuple[int, int]]((0, 0))
+        self.tasks.watch(lambda _: self.update_stats(), init=True)
+
+    def update_stats(self) -> None:
+        """Update statistics based on current tasks."""
+        done_count = sum(1 for task in self.tasks.value if task.done.value)
+        total_count = len(self.tasks.value)
+        self.stats.set((done_count, total_count))
+
+    def add_task(self, text: str) -> None:
+        text = text.strip()
+        if not text:
+            return None
+        new_task = TaskModel(State(text))
+        new_task.done.watch(lambda _: self.update_stats(), init=True)
+
+        self.tasks.update(lambda ts: [*ts, new_task])
+        self.entry_text.set("")
+
+    def remove_task(self, task: TaskModel):
+        self.tasks.update(lambda ts: [t for t in ts if t is not task])
+
+
+def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
     box = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,
         spacing=12,
@@ -87,40 +116,6 @@ def TodoApp() -> Gtk.Widget:
     )
     lifecycle = WidgetLifecycle(box)
 
-    # Application state
-    tasks = State[Sequence[TaskModel]](
-        [
-            TaskModel(State("Learn ReactiveGTK")),
-            TaskModel(State("Build a todo app")),
-            TaskModel(State("Write documentation")),
-        ]
-    )
-
-    entry_text = State("")
-    
-    # Topics for event communication
-    clear_entry_topic = Topic[None]()
-    add_task_topic = Topic[str]()
-
-    # Add task function
-    def add_task(text: str = None):
-        if text is None:
-            text = entry_text.value.strip()
-        if text:
-            new_task = TaskModel(State(text))
-            tasks.update(lambda ts: [*ts, new_task])
-            clear_entry_topic.publish(None)
-
-    # Remove task function
-    def remove_task(task: TaskModel):
-        tasks.update(lambda ts: [t for t in ts if t is not task])
-
-    # Subscribe to add task events
-    @lifecycle.subscribe(add_task_topic)
-    def _(text: str):
-        add_task(text)
-
-    # Entry and add button
     @into(box.append)
     def _():
         entry_box = Gtk.Box(
@@ -129,21 +124,13 @@ def TodoApp() -> Gtk.Widget:
 
         @into(entry_box.append)
         def _():
-            entry = Gtk.Entry(placeholder_text="Add a new task...", hexpand=True)
+            entry = Gtk.Entry(placeholder_text="Add a new task...", hexpand=True, width_request=300)
 
-            @lifecycle.watch((entry, "changed"))
-            def _():
-                entry_text.set(entry.get_text())
+            view_model.entry_text.bind(entry, "text", two_way=True)
 
-            @lifecycle.watch((entry, "activate"))
-            def _():
-                add_task_topic.publish(entry_text.value.strip())
-
-            # Subscribe to clear entry events
-            @lifecycle.subscribe(clear_entry_topic)
+            @lifecycle.subscribe(entry, "activate")
             def _(_):
-                entry.set_text("")
-                entry_text.set("")
+                view_model.add_task(view_model.entry_text.value.strip())
 
             return entry
 
@@ -152,46 +139,49 @@ def TodoApp() -> Gtk.Widget:
             add_button = Gtk.Button(
                 icon_name="list-add-symbolic",
                 tooltip_text="Add task",
+                css_classes=["suggested-action"],
             )
 
-            @lifecycle.watch((add_button, "clicked"))
-            def _():
-                add_task_topic.publish(entry_text.value.strip())
+            view_model.entry_text.map(lambda t: bool(t.strip())).bind(add_button, "sensitive")
 
-            @lifecycle.watch(entry_text, init=True)
-            def _():
-                add_button.set_sensitive(bool(entry_text.value.strip()))
+            @lifecycle.subscribe(add_button, "clicked")
+            def _(_):
+                view_model.add_task(view_model.entry_text.value.strip())
 
             return add_button
 
         return entry_box
 
-    # Task list
     @into(box.append)
     def _():
-        return TaskList(tasks, remove_task)
+        return TaskList(view_model.tasks, on_remove=view_model.remove_task)
 
-    # Task statistics
     @into(box.append)
     def _():
         stats_label = Gtk.Label(css_classes=["caption"])
-
-        @lifecycle.watch(tasks, init=True)
-        def _():
-            total = len(tasks.value)
-            completed = sum(1 for task in tasks.value if task.done.value)
-            remaining = total - completed
-
-            if total == 0:
-                text = "No tasks"
-            else:
-                text = f"{completed}/{total} completed, {remaining} remaining"
-
-            stats_label.set_text(text)
+        view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(
+            stats_label, "label"
+        )
 
         return stats_label
 
     return box
+
+
+def TodoWindow() -> Adw.Window:
+    """Create the main application window for the Todo app."""
+    window = Adw.Window(title="Todo App")
+    window.set_default_size(400, 600)
+
+    @into(window.set_content)
+    def _():
+        toolbar_view = Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT)
+        toolbar_view.add_top_bar(Adw.HeaderBar())
+        toolbar_view.set_content(TodoView(TodoViewModel()))
+
+        return toolbar_view
+
+    return window
 
 
 if __name__ == "__main__":
@@ -199,11 +189,10 @@ if __name__ == "__main__":
 
     @preview("TaskWidget")
     def _(_) -> Gtk.Widget:
-        # Sample task for preview
         sample_task = TaskModel(State("Sample Task"))
 
         def dummy_remove(task):
-            print(f"Would remove: {task.title.value}")
+            print(f"TaskWidget: Would remove: {task.title.value}")
 
         listbox = Gtk.ListBox(
             selection_mode=Gtk.SelectionMode.NONE,
@@ -216,7 +205,6 @@ if __name__ == "__main__":
 
     @preview("TaskList")
     def _(_) -> Gtk.Widget:
-        # Sample tasks for preview
         sample_tasks = State[Sequence[TaskModel]](
             [
                 TaskModel(State("Task 1")),
@@ -226,12 +214,16 @@ if __name__ == "__main__":
         )
 
         def dummy_remove(task):
-            print(f"Would remove: {task.title.value}")
+            print(f"TaskList: Would remove: {task.title.value}")
 
         return TaskList(sample_tasks, dummy_remove)
 
-    @preview("TodoApp")
+    @preview("TodoView")
     def _(_) -> Gtk.Widget:
-        return TodoApp()
+        return TodoView(TodoViewModel())
+
+    @preview("TodoWindow")
+    def _(_) -> Adw.Window:
+        return TodoWindow()
 
     preview.run()

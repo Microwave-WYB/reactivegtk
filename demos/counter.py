@@ -1,5 +1,5 @@
 import gi
-from reactivegtk import State, WidgetLifecycle, into
+from reactivegtk import WidgetLifecycle, into, MutableState
 
 gi.require_versions(
     {
@@ -18,7 +18,7 @@ def Counter() -> Gtk.Widget:
         halign=Gtk.Align.CENTER,
     )
     lifecycle = WidgetLifecycle(mainbox)
-    count = State(0)
+    count = MutableState(0)
 
     @into(mainbox.append)
     def _():
@@ -42,8 +42,8 @@ def Counter() -> Gtk.Widget:
                 icon_name="list-remove-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
             )
 
-            @lifecycle.watch((button, "clicked"))
-            def _():
+            @lifecycle.subscribe(button, "clicked")
+            def _(_):
                 count.update(lambda x: x - 1)
 
             return button
@@ -56,8 +56,8 @@ def Counter() -> Gtk.Widget:
                 valign=Gtk.Align.CENTER,
             )
 
-            @lifecycle.watch((button, "clicked"))
-            def _():
+            @lifecycle.subscribe(button, "clicked")
+            def _(_):
                 count.set(0)
 
             return button
@@ -68,8 +68,8 @@ def Counter() -> Gtk.Widget:
                 icon_name="list-add-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
             )
 
-            @lifecycle.watch((button, "clicked"))
-            def _():
+            @lifecycle.subscribe(button, "clicked")
+            def _(_):
                 count.update(lambda x: x + 1)
 
             return button

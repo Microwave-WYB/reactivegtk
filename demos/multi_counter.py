@@ -2,7 +2,14 @@ import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 import gi
-from reactivegtk import State, WidgetLifecycle, into, bind_sequence, watch, start_event_loop
+from reactivegtk import (
+    WidgetLifecycle,
+    into,
+    bind_sequence,
+    start_event_loop,
+    MutableState,
+)
+from reactivegtk.lifecycle import subscribe
 
 gi.require_versions(
     {
@@ -15,8 +22,8 @@ from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
 
 @dataclass
 class CounterModel:
-    count: State[int] = field(default_factory=lambda: State(0))
-    auto: State[bool] = field(default_factory=lambda: State(False))
+    count: MutableState[int] = field(default_factory=lambda: MutableState(0))
+    auto: MutableState[bool] = field(default_factory=lambda: MutableState(False))
 
 
 def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
@@ -26,21 +33,21 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         valign=Gtk.Align.CENTER,
         halign=Gtk.Align.CENTER,
     )
-    binder = WidgetLifecycle(vbox)
+    lifecycle = WidgetLifecycle(vbox)
 
-    @binder.watch((vbox, "realize"))
-    def _():
+    @lifecycle.subscribe(vbox, "realize")
+    def _(_):
         print("Counter widget realized")
 
-    @binder.watch((vbox, "unrealize"))
-    def _():
+    @lifecycle.subscribe(vbox, "unrealize")
+    def _(_):
         print("Counter widget unrealized")
 
-    @binder.watch((vbox, "destroy"))
-    def _():
+    @lifecycle.subscribe(vbox, "destroy")
+    def _(_):
         print("Counter widget destroyed")
 
-    @binder.effect(model.auto, event_loop=event_loop)
+    @lifecycle.effect(model.auto, event_loop=event_loop)
     async def _():
         while model.auto.value:
             await asyncio.sleep(1)
@@ -61,8 +68,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
                 icon_name="list-remove-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
             )
 
-            @binder.watch((button, "clicked"))
-            def _():
+            @lifecycle.subscribe(button, "clicked")
+            def _(_):
                 model.count.update(lambda x: x - 1)
 
             return button
@@ -73,8 +80,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
                 css_classes=["title-2"], margin_start=12, margin_end=12, valign=Gtk.Align.CENTER
             )
 
-            @binder.watch(model.count, init=True)
-            def _():
+            @lifecycle.watch(model.count, init=True)
+            def _(_):
                 label.set_label(str(model.count.value))
 
             return label
@@ -85,8 +92,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
                 icon_name="list-add-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
             )
 
-            @binder.watch((button, "clicked"))
-            def _():
+            @lifecycle.subscribe(button, "clicked")
+            def _(_):
                 model.count.update(lambda x: x + 1)
 
             return button
@@ -97,8 +104,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     def _():
         button = Gtk.Button(label="Reset", css_classes=["destructive-action"])
 
-        @binder.watch((button, "clicked"))
-        def _():
+        @lifecycle.subscribe(button, "clicked")
+        def _(_):
             model.count.set(0)
 
         return button
@@ -107,13 +114,13 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     def _():
         button = Gtk.Button()
 
-        @binder.watch((button, "clicked"))
-        def _():
+        @lifecycle.subscribe(button, "clicked")
+        def _(_):
             model.auto.set(not model.auto.value)
 
-        @binder.watch(model.auto, init=True)
-        def _():
-            button.set_label("Stop Auto-increment" if model.auto.value else "Start Auto-increment")
+        @lifecycle.watch(model.auto, init=True)
+        def _(auto: bool):
+            button.set_label("Stop Auto-increment" if auto else "Start Auto-increment")
 
         return button
 
@@ -121,7 +128,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
 
 
 def CounterBox(
-    models: State[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
 ) -> Gtk.Widget:
     box = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,
@@ -164,8 +171,8 @@ def CounterBox(
                 tooltip_text="Remove Counter",
             )
 
-            @watch(remove_button, (remove_button, "clicked"))
-            def _():
+            @subscribe(remove_button, remove_button, "clicked")
+            def _(_):
                 current_models = list(models.value)
                 try:
                     current_models.remove(item)
@@ -181,7 +188,7 @@ def CounterBox(
 
 
 def CounterListBox(
-    models: State[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
 ) -> Gtk.Widget:
     listbox = Gtk.ListBox(
         margin_top=12,
@@ -233,8 +240,8 @@ def CounterListBox(
                 tooltip_text="Remove Counter",
             )
 
-            @lifecycle.watch((remove_button, "clicked"))
-            def _():
+            @lifecycle.subscribe(remove_button, "clicked")
+            def _(_):
                 current_models = list(models.value)
                 current_models.remove(item)
                 models.set(current_models)
@@ -247,7 +254,7 @@ def CounterListBox(
 
 
 def CounterFlowBox(
-    models: State[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
 ) -> Gtk.Widget:
     flowbox = Gtk.FlowBox(
         margin_top=12,
@@ -268,8 +275,8 @@ def CounterFlowBox(
         key_fn=lambda model: id(model),
     )
     def _(item: CounterModel) -> Gtk.FlowBoxChild:
-        # Create FlowBoxChild directly
         child = Gtk.FlowBoxChild()
+        child_lifecycle = WidgetLifecycle(child)
 
         # Container for the counter content
         box = Gtk.Box(
@@ -298,8 +305,8 @@ def CounterFlowBox(
                 tooltip_text="Remove Counter",
             )
 
-            @watch(remove_button, (remove_button, "clicked"))
-            def _():
+            @child_lifecycle.subscribe(remove_button, "clicked")
+            def _(_):
                 current_models = list(models.value)
                 try:
                     current_models.remove(item)
@@ -317,7 +324,7 @@ def CounterFlowBox(
 def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
     window = Adw.ApplicationWindow(title="Counter")
     window.set_default_size(800, 600)
-    models: State[Sequence[CounterModel]] = State([CounterModel()])
+    models: MutableState[Sequence[CounterModel]] = MutableState([CounterModel()])
 
     @into(window.set_content)
     def _():
@@ -333,8 +340,8 @@ def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
             def _():
                 add_button = Gtk.Button(label="Add Counter", css_classes=["suggested-action"])
 
-                @watch(add_button, (add_button, "clicked"))
-                def _():
+                @subscribe(add_button, add_button, "clicked")
+                def _(_):
                     current_models = list(models.value)
                     current_models.append(CounterModel())
                     models.set(current_models)
@@ -355,7 +362,7 @@ def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
 
                 @into(clamp.set_child)
                 def _():
-                    return CounterFlowBox(models, event_loop)
+                    return CounterListBox(models, event_loop)
 
                 return clamp
 

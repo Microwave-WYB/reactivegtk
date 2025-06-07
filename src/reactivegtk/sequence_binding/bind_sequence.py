@@ -125,7 +125,7 @@ def bind_sequence(
 
         # Set up the watch
         @watch(container, items, init=True)
-        def _():
+        def _(_):
             sync_items()
 
     return decorator
