@@ -1,9 +1,9 @@
 import asyncio
 import gi
-from reactivegtk import State, WidgetLifecycle, into, MutableState
+from reactivegtk.state import State, MutableState
+from reactivegtk.lifecycle.core import WidgetLifecycle
+from reactivegtk.utils import into, start_event_loop
 from typing import Callable, overload
-
-from reactivegtk.utils import start_event_loop
 
 gi.require_versions(
     {

@@ -6,7 +6,7 @@ import gi
 
 from reactivegtk.connection import Connection
 from reactivegtk.effect import Effect
-from reactivegtk.lifecycle._lifecycle_manager import LifecycleManager, SignalSpec
+from reactivegtk.lifecycle._lifecycle_manager import LifecycleManager
 from reactivegtk.signal import Signal
 from reactivegtk.state import State
 
@@ -20,27 +20,19 @@ R = TypeVar("R")
 
 
 def effect(
-    widget: Gtk.Widget,
     event_loop: asyncio.AbstractEventLoop,
-    *signals: SignalSpec | State,
-) -> Callable[[Callable[[], Awaitable[T]]], Effect[T]]:
-    """Bind the side effect to a widget with proper lifecycle management."""
+) -> Callable[[Callable[[], Awaitable]], Callable[..., None]]:
+    """Create a launcher function that ignores arguments and launches the effect."""
 
-    def decorator(func: Callable[[], Awaitable[T]]) -> Effect[T]:
-        """Decorator to create a SideEffect that can be called with the object."""
+    def decorator(func: Callable[[], Awaitable[T]]) -> Callable[..., None]:
+        """Decorator to create a launcher function that can be called with any arguments."""
         side_effect = Effect(func, event_loop)
-        lifecycle_manager = LifecycleManager.get_instance(widget)
-        lifecycle_manager.add_effect(side_effect)
 
-        # Launch immediately
-        side_effect.launch()
+        def launcher(*args) -> None:
+            """Launch the effect, ignoring all arguments."""
+            side_effect.launch()
 
-        # Connect to signals using lifecycle state method
-        signal_specs = lifecycle_manager.state.process_signal_specs(signals)
-        for signal_spec in signal_specs:
-            lifecycle_manager.create_signal_connection(signal_spec, lambda *_: side_effect.launch())
-
-        return side_effect
+        return launcher
 
     return decorator
 
@@ -157,10 +149,10 @@ class WidgetLifecycle(Generic[WidgetT]):
         return subscribe(self.widget, *args)
 
     def effect[T](
-        self, *signals: SignalSpec | State, event_loop: asyncio.AbstractEventLoop
-    ) -> Callable[[Callable[[], Awaitable[T]]], Effect[T]]:
-        """Create and launch an effect that can respond to GTK signals."""
-        return effect(self.widget, event_loop, *signals)
+        self, event_loop: asyncio.AbstractEventLoop
+    ) -> Callable[[Callable[[], Awaitable]], Callable[..., None]]:
+        """Create a launcher function that ignores arguments and launches the effect."""
+        return effect(event_loop)
 
     def on_cleanup(self) -> Callable[[Callable[[], None]], Callable[[], None]]:
         """Subscribe to cleanup events for this widget."""

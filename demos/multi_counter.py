@@ -47,7 +47,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     def _():
         print("Counter widget destroyed")
 
-    @lifecycle.effect(model.auto, event_loop=event_loop)
+    @lifecycle.watch(model.auto, init=True)
+    @lifecycle.effect(event_loop)
     async def _():
         while model.auto.value:
             await asyncio.sleep(1)
