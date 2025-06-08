@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import TypeVar, Generic, Callable
 from collections.abc import Sequence, Mapping, Iterator
+from itertools import chain
 
 
 SourceT = TypeVar("SourceT")
@@ -84,14 +85,15 @@ def compute_diff_operations(
     }
     new_keys_only = {key for key in new_key_to_index if key not in old_key_to_index}
 
-    # Items to remove (completely deleted - NOT moved)
+    # 1. Remove deleted items first
     yield from (Remove(key=key) for key in deleted_keys)
 
-    # New items
-    yield from (Insert(key=key, at=new_key_to_index[key]) for key in new_keys_only)
+    # 2. Then handle moves and inserts by final position (reverse order)
+    moves = (Move(key=key, at=new_key_to_index[key]) for key in moved_keys)
+    inserts = (Insert(key=key, at=new_key_to_index[key]) for key in new_keys_only)
 
-    # Moved items (existing items that change position)
-    yield from (Move(key=key, at=new_key_to_index[key]) for key in moved_keys)
+    # Sort by position (descending) to avoid position shifts
+    yield from sorted(chain(moves, inserts), key=lambda op: op.at, reverse=True)
 
 
 def diff_update(
