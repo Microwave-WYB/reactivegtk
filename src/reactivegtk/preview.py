@@ -82,7 +82,7 @@ class Preview:
 
     def _create_widget(self, widget_name: str) -> Gtk.Widget:
         """Create a widget from the factory, using cache if available."""
-        
+
         # Check cache first (except for windows which should always create launch buttons)
         if widget_name in self._widget_cache:
             cached_widget = self._widget_cache[widget_name]
@@ -97,7 +97,7 @@ class Preview:
 
         widget_factory = self.widgets[widget_name]
         widget = widget_factory(self.event_loop)
-        
+
         # If the widget is a window, create a launch button instead
         if isinstance(widget, Gtk.Window):
             # Don't hold onto the original window - destroy it immediately
@@ -106,7 +106,7 @@ class Preview:
             # Cache the launch button, not the window
             self._widget_cache[widget_name] = launch_button
             return launch_button
-        
+
         # Cache non-window widgets
         self._widget_cache[widget_name] = widget
         return widget
@@ -126,6 +126,7 @@ class Preview:
             launch_button = Gtk.Button(
                 label=f"Launch {widget_name}",
                 css_classes=["suggested-action", "pill"],
+                halign=Gtk.Align.CENTER,
             )
 
             @lifecycle.subscribe(launch_button, "clicked")
@@ -133,11 +134,11 @@ class Preview:
                 # Always create a fresh window instance
                 widget_factory = self.widgets[widget_name]
                 fresh_window = widget_factory(self.event_loop)
-                
+
                 # Ensure it's actually a window
                 if not isinstance(fresh_window, Gtk.Window):
                     return
-                
+
                 # Present the window - GTK will handle lifecycle
                 fresh_window.present()
 
@@ -151,8 +152,6 @@ class Preview:
                 wrap=True,
                 justify=Gtk.Justification.CENTER,
             )
-
-
 
         return button_box
 
@@ -315,7 +314,7 @@ def PreviewArea(
                         current_parent = preview_widget.get_parent()
                         if current_parent:
                             preview_widget.unparent()
-                        
+
                         preview_box.append(preview_widget)
                     else:
                         raise Exception("Failed to create widget")

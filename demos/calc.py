@@ -1,7 +1,7 @@
 from typing import Sequence
 import gi
 from reactivegtk import (
-    State,
+    MutableState,
     bind_sequence,
     into,
     Preview,
@@ -17,7 +17,7 @@ gi.require_versions(
 from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
 
 
-def ResultDisplay(results: State[Sequence[str]]) -> Gtk.Widget:
+def ResultDisplay(results: MutableState[Sequence[str]]) -> Gtk.Widget:
     listbox = Gtk.ListBox(
         selection_mode=Gtk.SelectionMode.NONE,
         css_classes=["boxed-list"],
@@ -30,7 +30,7 @@ def ResultDisplay(results: State[Sequence[str]]) -> Gtk.Widget:
     return listbox
 
 
-def LiveDisplay(text: State[str]) -> Gtk.Widget:
+def LiveDisplay(text: MutableState[str]) -> Gtk.Widget:
     box = Gtk.Frame(
         valign=Gtk.Align.CENTER,
         halign=Gtk.Align.CENTER,
@@ -79,11 +79,11 @@ if __name__ == "__main__":
     @preview("test")
     def PreviewResultDisplay(_) -> Gtk.Widget:
         """Preview for ResultDisplay."""
-        return ResultDisplay(State(["1 + 1 = 2", "1 + 2 = 3"]))
+        return ResultDisplay(MutableState(["1 + 1 = 2", "1 + 2 = 3"]))
 
     @preview
     def PreviewLiveDisplay(_) -> Gtk.Widget:
         """Preview for LiveDisplay."""
-        return LiveDisplay(State("1 + 1"))
+        return LiveDisplay(MutableState("1 + 1"))
 
     preview.run()

@@ -87,12 +87,9 @@ class State(Generic[T]):
         self,
         target_object: GObject.Object,
         target_property: str,
-        two_way: bool = False,
     ) -> GObject.Binding:
         """Bind this state's value to a target object's property."""
         flags = GObject.BindingFlags.SYNC_CREATE
-        if two_way:
-            flags |= GObject.BindingFlags.BIDIRECTIONAL
         return self._gobject.bind_property(
             "value",
             target_object,
@@ -151,3 +148,19 @@ class MutableState(State[T]):
     def update(self, fn: Callable[[T], T]) -> None:
         """Update the state value using a function."""
         self.set(fn(self.value))
+
+    def twoway_bind(
+        self,
+        target_object: GObject.Object,
+        target_property: str,
+    ) -> GObject.Binding:
+        """Create a two-way binding with a target object's property."""
+        flags = GObject.BindingFlags.SYNC_CREATE | GObject.BindingFlags.BIDIRECTIONAL
+        return self._gobject.bind_property(
+            "value",
+            target_object,
+            target_property,
+            flags,
+            lambda binding, value: value,
+            lambda binding, value: value,
+        )

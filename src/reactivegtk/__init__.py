@@ -2,7 +2,7 @@ from reactivegtk.connection import Connection
 from reactivegtk.effect import Effect
 from reactivegtk.lifecycle import WidgetLifecycle, effect, watch
 from reactivegtk.preview import Preview
-from reactivegtk.sequence_binding.bind_sequence import bind_sequence
+from reactivegtk.sequence_binding.core import bind_sequence
 from reactivegtk.signal import Signal
 from reactivegtk.state import MutableState, State
 from reactivegtk.utils import into, start_event_loop
