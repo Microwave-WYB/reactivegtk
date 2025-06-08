@@ -1,11 +1,11 @@
-from reactivegtk.lifecycle import effect, watch, WidgetLifecycle
-from reactivegtk.state import State, MutableState
 from reactivegtk.connection import Connection
-from reactivegtk.signal import Signal
 from reactivegtk.effect import Effect
-from reactivegtk.utils import into, start_event_loop
+from reactivegtk.lifecycle import WidgetLifecycle, effect, watch
 from reactivegtk.preview import Preview
 from reactivegtk.sequence_binding.bind_sequence import bind_sequence
+from reactivegtk.signal import Signal
+from reactivegtk.state import MutableState, State
+from reactivegtk.utils import into, start_event_loop
 
 __all__ = [
     "Effect",
