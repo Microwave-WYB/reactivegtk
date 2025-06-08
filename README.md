@@ -35,40 +35,44 @@ from reactivegtk import MutableState, WidgetLifecycle, into
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Gtk, Adw
 
+
 def HelloWorld():
     # Create reactive state
-    count = MutableState(0)
+    name = MutableState("")
 
     # Create container widget
     box = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,
         spacing=12,
         halign=Gtk.Align.CENTER,
-        valign=Gtk.Align.CENTER
+        valign=Gtk.Align.CENTER,
     )
 
     # Widget lifecycle management
     lifecycle = WidgetLifecycle(box)
 
-    # Add label that automatically updates when count changes
+    # Add entry for name input
+    @into(box.append)
+    def _():
+        entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
+
+        name.twoway_bind(entry, "text")
+
+        @lifecycle.subscribe(entry, "activate")
+        def _(_):
+            print(f"Entry activated with text: {name.value}")
+
+        return entry
+
+    # Add label that automatically updates when name changes
     @into(box.append)
     def _():
         label = Gtk.Label(css_classes=["title-1"])
-        count.map(lambda x: f"Count: {x}").bind(label, "label")
+        name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label")
         return label
 
-    # Add button that updates the count
-    @into(box.append)
-    def _():
-        button = Gtk.Button(label="Click me!")
-
-        @lifecycle.subscribe(button, "clicked")
-        def _(_):
-            count.update(lambda x: x + 1)
-
-        return button
-
     return box
+
 
 # Create and run the app
 def App():
@@ -82,9 +86,14 @@ def App():
 
     return app
 
+
 if __name__ == "__main__":
     App().run([])
 ```
+
+This results:
+
+![Hello Example](assets/hello.gif)
 
 ## Core Concepts
 
@@ -182,17 +191,22 @@ Automatically manage lists of widgets that sync with collections:
 
 ```python
 from reactivegtk import bind_sequence
+from collections.abc import Sequence
 
-items = MutableState(["Apple", "Banana", "Cherry"])
+# Must use State[Sequence[T]] type annotation for type checking
+items = MutableState[Sequence[str]](["Apple", "Banana", "Cherry"])
 listbox = Gtk.ListBox()
 
 @bind_sequence(listbox, items)
 def create_item(item: str) -> Gtk.Widget:
     return Gtk.Label(label=item)
 
-# Adding/removing items from the state automatically updates the UI
-items.update(lambda lst: lst + ["Date"])  # Adds new widget
+# Adding/removing items using immutable patterns
+items.update(lambda lst: [*lst, "Date"])  # Append item
+items.update(lambda lst: [item for item in lst if item != "Apple"])  # Remove item
 ```
+
+**Note**: Sequences must be treated immutably to ensure state updates trigger properly. Use unpacking (`[*lst, new_item]`) and list comprehensions rather than mutating methods like `.append()` or `.remove()`.
 
 ### 6. Async Effects
 
