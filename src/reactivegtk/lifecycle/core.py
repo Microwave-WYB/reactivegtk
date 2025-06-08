@@ -26,11 +26,11 @@ def effect(
 
     def decorator(func: Callable[[], Awaitable[T]]) -> Callable[..., None]:
         """Decorator to create a launcher function that can be called with any arguments."""
-        side_effect = Effect(func, event_loop)
+        effect = Effect(func, event_loop)
 
         def launcher(*args) -> None:
             """Launch the effect, ignoring all arguments."""
-            side_effect.launch()
+            effect.launch()
 
         return launcher
 
