@@ -26,7 +26,7 @@ pip install git+https://https://github.com/Microwave-WYB/reactivegtk.git
 
 ## Quick Start: Hello World
 
-Here's a minimal counter app to get you started:
+Here's a minimal hello world app to get you started:
 
 ```python
 import gi
