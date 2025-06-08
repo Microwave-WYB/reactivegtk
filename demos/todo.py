@@ -1,5 +1,4 @@
 from collections.abc import Sequence
-from dataclasses import dataclass, field
 from typing import Callable
 
 import gi
@@ -14,16 +13,31 @@ gi.require_versions(
         "Gdk": "4.0",
     }
 )
-from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
+from gi.repository import Adw, GObject, Gtk  # type: ignore # noqa: E402
 
 
-@dataclass(frozen=True)
-class TaskModel:
-    title: MutableState[str]
-    done: MutableState[bool] = field(default_factory=lambda: MutableState(False))
+class TaskViewModel:
+    def __init__(self, title: str):
+        self._title: MutableState[str] = MutableState(title)
+        self._done: MutableState[bool] = MutableState(False)
+
+    @property
+    def title(self) -> State[str]:
+        return self._title
+
+    @property
+    def done(self) -> State[bool]:
+        return self._done
+
+    def set_title(self, title: str) -> None:
+        self._title.set(title)
+
+    def bind_done_twoway(self, obj: GObject.Object, property_name: str) -> None:
+        """Bind done state to a GObject property with two-way binding"""
+        self._done.twoway_bind(obj, property_name)
 
 
-def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.ActionRow:
+def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) -> Adw.ActionRow:
     row = Adw.ActionRow()
     task.title.bind(row, "title")
     lifecycle = WidgetLifecycle(row)
@@ -35,9 +49,7 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
             valign=Gtk.Align.CENTER,
         )
 
-        @lifecycle.subscribe(checkbox, "toggled")
-        def _(_):
-            task.done.set(checkbox.get_active())
+        task.bind_done_twoway(checkbox, "active")
 
         return checkbox
 
@@ -60,8 +72,8 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
 
 
 def TaskList(
-    tasks: State[Sequence[TaskModel]],
-    on_remove: Callable[[TaskModel], None],
+    tasks: State[Sequence[TaskViewModel]],
+    on_remove: Callable[[TaskViewModel], None],
 ) -> Gtk.Widget:
     overlay = Gtk.Overlay()
 
@@ -73,6 +85,9 @@ def TaskList(
                 Gtk.ListBox(
                     selection_mode=Gtk.SelectionMode.NONE,
                     css_classes=["boxed-list"],
+                    margin_top=4,
+                    margin_start=4,
+                    margin_end=4,
                     margin_bottom=12,
                 ),
                 tasks,
@@ -91,28 +106,49 @@ def TaskList(
 
 class TodoViewModel:
     def __init__(self):
-        self.tasks = MutableState[Sequence[TaskModel]]([])
-        self.entry_text = MutableState("")
-        self.stats = MutableState[tuple[int, int]]((0, 0))
-        self.tasks.watch(lambda _: self.update_stats(), init=True)
+        self._tasks = MutableState[Sequence[TaskViewModel]]([])
+        self._entry_text = MutableState("")
+        self._stats = MutableState[tuple[int, int]]((0, 0))
+        self._tasks.watch(lambda _: self.update_stats(), init=True)
+
+    @property
+    def tasks(self) -> State[Sequence[TaskViewModel]]:
+        return self._tasks
+
+    @property
+    def entry_text(self) -> State[str]:
+        return self._entry_text
+
+    def bind_entry_text_twoway(self, obj: GObject.Object, property_name: str) -> None:
+        """Bind entry text to a GObject property with two-way binding"""
+        self._entry_text.twoway_bind(obj, property_name)
+
+    @property
+    def stats(self) -> State[tuple[int, int]]:
+        return self._stats
 
     def update_stats(self) -> None:
-        done_count = sum(1 for task in self.tasks.value if task.done.value)
-        total_count = len(self.tasks.value)
-        self.stats.set((done_count, total_count))
+        done_count = sum(1 for task in self._tasks.value if task.done.value)
+        total_count = len(self._tasks.value)
+        self._stats.set((done_count, total_count))
 
     def add_task(self, text: str) -> None:
         text = text.strip()
         if not text:
             return None
-        new_task = TaskModel(MutableState(text))
-        new_task.done.watch(lambda _: self.update_stats(), init=True)
+        new_task = TaskViewModel(text)
+        new_task._done.watch(lambda _: self.update_stats(), init=True)
 
-        self.tasks.update(lambda ts: [*ts, new_task])
-        self.entry_text.set("")
+        self._tasks.update(lambda ts: [*ts, new_task])
 
-    def remove_task(self, task: TaskModel):
-        self.tasks.update(lambda ts: [t for t in ts if t is not task])
+    def remove_task(self, task: TaskViewModel):
+        self._tasks.update(lambda ts: [t for t in ts if t is not task])
+
+    def set_entry_text(self, text: str) -> None:
+        self._entry_text.set(text)
+
+    def clear_entry_text(self) -> None:
+        self._entry_text.set("")
 
 
 def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
@@ -145,11 +181,12 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                     hexpand=True,
                 )
 
-                view_model.entry_text.twoway_bind(entry, "text")
+                view_model.bind_entry_text_twoway(entry, "text")
 
                 @lifecycle.subscribe(entry, "activate")
                 def _(_):
-                    view_model.add_task(view_model.entry_text.value.strip())
+                    view_model.add_task(view_model.entry_text.value)
+                    view_model.clear_entry_text()
 
                 return entry
 
@@ -165,7 +202,8 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
 
                 @lifecycle.subscribe(add_button, "clicked")
                 def _(_):
-                    view_model.add_task(view_model.entry_text.value.strip())
+                    view_model.add_task(view_model.entry_text.value)
+                    view_model.clear_entry_text()
 
                 return add_button
 
@@ -194,21 +232,36 @@ def TodoWindow() -> Adw.Window:
     window.set_default_size(300, 600)
     window.set_resizable(True)
 
-    toolbar_view = Adw.ToolbarView(
-        top_bar_style=Adw.ToolbarStyle.FLAT, bottom_bar_style=Adw.ToolbarStyle.RAISED
-    )
-    toolbar_view.add_top_bar(Adw.HeaderBar())
-
     view_model = TodoViewModel()
-    toolbar_view.set_content(TodoView(view_model))
 
-    stats_label = Gtk.Label(css_classes=["caption"])
-    view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(
-        stats_label, "label"
-    )
-    toolbar_view.add_bottom_bar(stats_label)
+    @into(window.set_content)
+    def _() -> Adw.ToolbarView:
+        toolbar_view = Adw.ToolbarView(
+            top_bar_style=Adw.ToolbarStyle.FLAT, bottom_bar_style=Adw.ToolbarStyle.RAISED
+        )
 
-    window.set_content(toolbar_view)
+        @into(toolbar_view.add_top_bar)
+        def _():
+            header_bar = Adw.HeaderBar(
+                title_widget=Adw.WindowTitle(title="Todo App"),
+                show_start_title_buttons=False,
+            )
+            return header_bar
+
+        @into(toolbar_view.set_content)
+        def _():
+            return TodoView(view_model)
+
+        @into(toolbar_view.add_bottom_bar)
+        def _():
+            stats_label = Gtk.Label(css_classes=["caption"])
+            view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(
+                stats_label, "label"
+            )
+            return stats_label
+
+        return toolbar_view
+
     return window
 
 
@@ -217,12 +270,16 @@ if __name__ == "__main__":
 
     @preview("TaskWidget")
     def _(_) -> Gtk.Widget:
-        sample_task = TaskModel(MutableState("Sample Task"))
+        sample_task = TaskViewModel("Sample Task")
 
         listbox = Gtk.ListBox(
             selection_mode=Gtk.SelectionMode.NONE,
             css_classes=["boxed-list"],
             width_request=300,
+            margin_bottom=4,
+            margin_top=4,
+            margin_start=4,
+            margin_end=4,
         )
 
         listbox.append(
@@ -232,11 +289,11 @@ if __name__ == "__main__":
 
     @preview("TaskList")
     def _(_) -> Gtk.Widget:
-        sample_tasks = State[Sequence[TaskModel]](
+        sample_tasks = State[Sequence[TaskViewModel]](
             [
-                TaskModel(MutableState("Task 1")),
-                TaskModel(MutableState("Task 2")),
-                TaskModel(MutableState("Task 3")),
+                TaskViewModel("Task 1"),
+                TaskViewModel("Task 2"),
+                TaskViewModel("Task 3"),
             ]
         )
 
