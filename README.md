@@ -15,7 +15,8 @@ A reactive UI framework for GTK4 applications in Python, inspired by modern reac
 ## Installation
 
 ```bash
-pip install reactivegtk
+# with pip
+pip install git+https://https://github.com/Microwave-WYB/reactivegtk.git
 ```
 
 **Requirements:**
