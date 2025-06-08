@@ -142,7 +142,6 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
         expression_label = Gtk.Label(
             label="",
             halign=Gtk.Align.END,
-            css_classes=["caption"],
             ellipsize=Pango.EllipsizeMode.END,
         )
         view_model.current_expression.map(lambda expr: expr or "0").bind(expression_label, "label")
