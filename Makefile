@@ -6,6 +6,7 @@ SRC_DIR := src
 DEMO_DIR := demos
 PYTHON_FILES := $(SRC_DIR) $(DEMO_DIR)
 PYTHON_VERSION := 3.10
+FILE ?=
 
 # Default target
 help:
@@ -14,7 +15,7 @@ help:
 	@echo "  format     - Format code with ruff"
 	@echo "  lint       - Lint code with ruff"
 	@echo "  typecheck  - Type check with pyright"
-	@echo "  doctest    - Run doctests"
+	@echo "  doctest    - Run doctests (use FILE=path/to/file.py for specific file)"
 	@echo "  pytest     - Run pytest (not implemented yet)"
 	@echo "  test       - Run doctests and pytest"
 	@echo "  check      - Run format, lint, and typecheck"
@@ -43,11 +44,20 @@ typecheck:
 
 # Run doctests
 doctest:
-	@echo "Running doctests..."
+ifdef FILE
+	@echo "Running doctests on $(FILE)..."
+	@if grep -q ">>>" $(FILE); then \
+		$(UV) run python -m doctest -v $(FILE); \
+	else \
+		echo "No doctests found in $(FILE)"; \
+	fi
+else
+	@echo "Running doctests on all files..."
 	@for file in $$(find $(SRC_DIR) $(DEMO_DIR) -name "*.py" -exec grep -l ">>>" {} \;); do \
 		echo "Testing $$file"; \
 		$(UV) run python -m doctest -v $$file; \
 	done
+endif
 
 # Run pytest
 pytest:
