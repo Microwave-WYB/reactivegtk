@@ -1,5 +1,6 @@
 import weakref
 from typing import Callable, Generic, TypeVar, cast
+
 import gi
 
 from reactivegtk.connection import Connection

@@ -1,5 +1,6 @@
 import weakref
 from typing import Callable, Generic, TypeVar
+
 import gi
 
 from reactivegtk.connection import Connection
@@ -8,7 +9,6 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("GObject", "2.0")
 gi.require_version("GLib", "2.0")
 from gi.repository import GLib, GObject  # type: ignore # noqa: E402
-
 
 T = TypeVar("T")
 

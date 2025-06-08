@@ -32,12 +32,16 @@ class TaskViewModel:
     def set_title(self, title: str) -> None:
         self._title.set(title)
 
-    def bind_done_twoway(self, obj: GObject.Object, property_name: str) -> GObject.Binding:
+    def bind_done_twoway(
+        self, obj: GObject.Object, property_name: str
+    ) -> GObject.Binding:
         """Bind done state to a GObject property with two-way binding"""
         return self._done.twoway_bind(obj, property_name)
 
 
-def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) -> Adw.ActionRow:
+def TaskWidget(
+    task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]
+) -> Adw.ActionRow:
     row = Adw.ActionRow()
     task.title.bind(row, "title")
     lifecycle = WidgetLifecycle(row)
@@ -171,7 +175,9 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
         @into(box.append)
         def _():
             entry_box = Gtk.Box(
-                orientation=Gtk.Orientation.HORIZONTAL, spacing=6, css_classes=["linked"]
+                orientation=Gtk.Orientation.HORIZONTAL,
+                spacing=6,
+                css_classes=["linked"],
             )
 
             @into(entry_box.append)
@@ -198,7 +204,9 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                     css_classes=["suggested-action"],
                 )
 
-                view_model.entry_text.map(lambda t: bool(t.strip())).bind(add_button, "sensitive")
+                view_model.entry_text.map(lambda t: bool(t.strip())).bind(
+                    add_button, "sensitive"
+                )
 
                 @lifecycle.subscribe(add_button, "clicked")
                 def _(_):
@@ -219,7 +227,9 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                 vexpand=True,
             )
 
-            scrolled.set_child(TaskList(view_model.tasks, on_remove=view_model.remove_task))
+            scrolled.set_child(
+                TaskList(view_model.tasks, on_remove=view_model.remove_task)
+            )
             return scrolled
 
         return box
@@ -237,7 +247,8 @@ def TodoWindow() -> Adw.Window:
     @into(window.set_content)
     def _() -> Adw.ToolbarView:
         toolbar_view = Adw.ToolbarView(
-            top_bar_style=Adw.ToolbarStyle.FLAT, bottom_bar_style=Adw.ToolbarStyle.RAISED
+            top_bar_style=Adw.ToolbarStyle.FLAT,
+            bottom_bar_style=Adw.ToolbarStyle.RAISED,
         )
 
         @into(toolbar_view.add_top_bar)
@@ -255,9 +266,9 @@ def TodoWindow() -> Adw.Window:
         @into(toolbar_view.add_bottom_bar)
         def _():
             stats_label = Gtk.Label(css_classes=["caption"])
-            view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(
-                stats_label, "label"
-            )
+            view_model.stats.map(
+                lambda stats: f"Done: {stats[0]} / Total: {stats[1]}"
+            ).bind(stats_label, "label")
             return stats_label
 
         return toolbar_view
@@ -283,7 +294,9 @@ if __name__ == "__main__":
         )
 
         listbox.append(
-            TaskWidget(sample_task, lambda task: print(f"Would remove: {task.title.value}"))
+            TaskWidget(
+                sample_task, lambda task: print(f"Would remove: {task.title.value}")
+            )
         )
         return listbox
 
@@ -299,7 +312,9 @@ if __name__ == "__main__":
 
         return Gtk.Overlay(
             width_request=300,
-            child=TaskList(sample_tasks, lambda task: print(f"Would remove: {task.title.value}")),
+            child=TaskList(
+                sample_tasks, lambda task: print(f"Would remove: {task.title.value}")
+            ),
         )
 
     @preview("TodoView")

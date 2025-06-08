@@ -1,8 +1,7 @@
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
-from typing import TypeVar, Generic, Callable
-from collections.abc import Sequence, Mapping, Iterator
 from itertools import chain
-
+from typing import Callable, Generic, TypeVar
 
 SourceT = TypeVar("SourceT")
 TargetT = TypeVar("TargetT")

@@ -66,7 +66,9 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         @into(hbox.append)
         def _():
             button = Gtk.Button(
-                icon_name="list-remove-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
+                icon_name="list-remove-symbolic",
+                css_classes=["circular"],
+                valign=Gtk.Align.CENTER,
             )
 
             @lifecycle.subscribe(button, "clicked")
@@ -78,7 +80,10 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         @into(hbox.append)
         def _():
             label = Gtk.Label(
-                css_classes=["title-2"], margin_start=12, margin_end=12, valign=Gtk.Align.CENTER
+                css_classes=["title-2"],
+                margin_start=12,
+                margin_end=12,
+                valign=Gtk.Align.CENTER,
             )
 
             @lifecycle.watch(model.count, init=True)
@@ -90,7 +95,9 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         @into(hbox.append)
         def _():
             button = Gtk.Button(
-                icon_name="list-add-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
+                icon_name="list-add-symbolic",
+                css_classes=["circular"],
+                valign=Gtk.Align.CENTER,
             )
 
             @lifecycle.subscribe(button, "clicked")
@@ -339,7 +346,9 @@ def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
             # Add Counter button in header
             @into(header_bar.pack_start)
             def _():
-                add_button = Gtk.Button(label="Add Counter", css_classes=["suggested-action"])
+                add_button = Gtk.Button(
+                    label="Add Counter", css_classes=["suggested-action"]
+                )
 
                 @subscribe(add_button, add_button, "clicked")
                 def _(_):

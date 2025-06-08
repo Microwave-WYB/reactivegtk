@@ -95,9 +95,13 @@ def subscribe(
 
             return signal_decorator
 
-        case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(signal_name, str):
+        case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(
+            signal_name, str
+        ):
 
-            def obj_name_decorator(func: Callable[[Sequence], None]) -> Callable[[Sequence], None]:
+            def obj_name_decorator(
+                func: Callable[[Sequence], None],
+            ) -> Callable[[Sequence], None]:
                 """Decorator to create a subscription that can be called with the object."""
                 lifecycle_manager = LifecycleManager.get_instance(widget)
                 signal_instance = Signal.from_obj_and_name(obj, signal_name)

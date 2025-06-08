@@ -1,10 +1,5 @@
 import gi
-from reactivegtk import (
-    MutableState,
-    into,
-    Preview,
-    WidgetLifecycle,
-)
+from reactivegtk import MutableState, Preview, WidgetLifecycle, each, into, unpack_into
 
 
 gi.require_versions(
@@ -28,41 +23,35 @@ class CalculatorViewModel:
         if self.has_error.value:
             self.clear()
 
-        # If we just evaluated, start fresh with new number
         if self.just_evaluated.value:
             self.current_expression.set(digit)
             self.just_evaluated.set(False)
-            # Don't update result when starting new number
         else:
             self.current_expression.update(lambda expr: expr + digit)
-            self._update_result()
 
     def append_operator(self, operator: str) -> None:
         if self.has_error.value:
             self.clear()
 
-        # If we just evaluated, continue with the result
         if self.just_evaluated.value:
             self.just_evaluated.set(False)
 
         current = self.current_expression.value
         if current and current[-1] not in "+-*/":
             self.current_expression.update(lambda expr: expr + operator)
-            self._update_result()
 
     def append_decimal(self) -> None:
         if self.has_error.value:
             self.clear()
 
-        # If we just evaluated, start fresh with "0."
         if self.just_evaluated.value:
             self.current_expression.set("0.")
             self.just_evaluated.set(False)
-            # Don't update result when starting new number
+
             return
 
         current = self.current_expression.value
-        # Check if current number already has a decimal
+
         parts = (
             current.replace("+", "|")
             .replace("-", "|")
@@ -75,7 +64,6 @@ class CalculatorViewModel:
                 self.current_expression.update(lambda expr: expr + "0.")
             else:
                 self.current_expression.update(lambda expr: expr + ".")
-            self._update_result()
 
     def clear(self) -> None:
         self.current_expression.set("")
@@ -88,19 +76,16 @@ class CalculatorViewModel:
             self.clear()
             return
 
-        # If we just evaluated, clear everything
         if self.just_evaluated.value:
             self.clear()
             return
 
         self.current_expression.update(lambda expr: expr[:-1] if expr else "")
-        self._update_result()
 
     def calculate(self) -> None:
         try:
             expr = self.current_expression.value
             if expr:
-                # Simple evaluation - in a real app you'd want a proper parser
                 result = eval(expr)
                 self.result.set(str(result))
                 self.current_expression.set(str(result))
@@ -110,21 +95,6 @@ class CalculatorViewModel:
             self.result.set("Error!")
             self.has_error.set(True)
             self.just_evaluated.set(False)
-
-    def _update_result(self) -> None:
-        try:
-            expr = self.current_expression.value
-            if expr and not expr.endswith(tuple("+-*/")):
-                # Only update result if expression contains operators
-                if any(op in expr for op in "+-*/"):
-                    result = eval(expr)
-                    self.result.set(str(result))
-                    self.has_error.set(False)
-            elif not expr:
-                self.result.set("0")
-                self.has_error.set(False)
-        except Exception:
-            pass
 
 
 def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
@@ -137,18 +107,15 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
         margin_bottom=6,
     )
 
-    @into(box.append)
-    def _():
+    @each(into(box.append))
+    def _() -> list[Gtk.Widget]:
         expression_label = Gtk.Label(
             label="",
             halign=Gtk.Align.END,
             ellipsize=Pango.EllipsizeMode.END,
         )
         view_model.current_expression.map(lambda expr: expr or "0").bind(expression_label, "label")
-        return expression_label
 
-    @into(box.append)
-    def _():
         result_label = Gtk.Label(
             label="0",
             halign=Gtk.Align.END,
@@ -157,7 +124,6 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
         )
         view_model.result.bind(result_label, "label")
 
-        # Change color on error
         def update_style(has_error: bool):
             if has_error:
                 result_label.add_css_class("error")
@@ -165,7 +131,8 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
                 result_label.remove_css_class("error")
 
         view_model.has_error.watch(update_style)
-        return result_label
+
+        return [expression_label, result_label]
 
     return box
 
@@ -214,45 +181,64 @@ def Keypad(view_model: CalculatorViewModel) -> Gtk.Widget:
         vexpand=True,
     )
 
-    # Row 0: Clear and backspace
-    grid.attach(CalcButton("C", view_model.clear, ["destructive-action"]), 0, 0, 3, 1)
-    grid.attach(
-        CalcButton("", view_model.backspace, ["flat"], icon_name="edit-clear-symbolic"), 3, 0, 1, 1
-    )
-
-    # Row 1: 7, 8, 9, /
-    grid.attach(CalcButton("7", lambda: view_model.append_digit("7")), 0, 1, 1, 1)
-    grid.attach(CalcButton("8", lambda: view_model.append_digit("8")), 1, 1, 1, 1)
-    grid.attach(CalcButton("9", lambda: view_model.append_digit("9")), 2, 1, 1, 1)
-    grid.attach(
-        CalcButton("÷", lambda: view_model.append_operator("/"), ["suggested-action"]), 3, 1, 1, 1
-    )
-
-    # Row 2: 4, 5, 6, *
-    grid.attach(CalcButton("4", lambda: view_model.append_digit("4")), 0, 2, 1, 1)
-    grid.attach(CalcButton("5", lambda: view_model.append_digit("5")), 1, 2, 1, 1)
-    grid.attach(CalcButton("6", lambda: view_model.append_digit("6")), 2, 2, 1, 1)
-    grid.attach(
-        CalcButton("×", lambda: view_model.append_operator("*"), ["suggested-action"]), 3, 2, 1, 1
-    )
-
-    # Row 3: 1, 2, 3, -
-    grid.attach(CalcButton("1", lambda: view_model.append_digit("1")), 0, 3, 1, 1)
-    grid.attach(CalcButton("2", lambda: view_model.append_digit("2")), 1, 3, 1, 1)
-    grid.attach(CalcButton("3", lambda: view_model.append_digit("3")), 2, 3, 1, 1)
-    grid.attach(
-        CalcButton("−", lambda: view_model.append_operator("-"), ["suggested-action"]), 3, 3, 1, 1
-    )
-
-    # Row 4: 0, ., =, +
-    grid.attach(CalcButton("0", lambda: view_model.append_digit("0")), 0, 4, 2, 1)
-    grid.attach(CalcButton(".", view_model.append_decimal), 2, 4, 1, 1)
-    grid.attach(
-        CalcButton("+", lambda: view_model.append_operator("+"), ["suggested-action"]), 3, 4, 1, 1
-    )
-
-    # Row 5: Equals
-    grid.attach(CalcButton("=", view_model.calculate, ["suggested-action"]), 0, 5, 4, 1)
+    @each(unpack_into(grid.attach))
+    def _() -> list[tuple[Gtk.Widget, int, int, int, int]]:
+        return [
+            # Row 0: Clear and backspace
+            (CalcButton("C", view_model.clear, ["destructive-action"]), 0, 0, 3, 1),
+            (
+                CalcButton("", view_model.backspace, ["flat"], icon_name="edit-clear-symbolic"),
+                3,
+                0,
+                1,
+                1,
+            ),
+            # Row 1: 7, 8, 9, /
+            (CalcButton("7", lambda: view_model.append_digit("7")), 0, 1, 1, 1),
+            (CalcButton("8", lambda: view_model.append_digit("8")), 1, 1, 1, 1),
+            (CalcButton("9", lambda: view_model.append_digit("9")), 2, 1, 1, 1),
+            (
+                CalcButton("÷", lambda: view_model.append_operator("/"), ["suggested-action"]),
+                3,
+                1,
+                1,
+                1,
+            ),
+            # Row 2: 4, 5, 6, *
+            (CalcButton("4", lambda: view_model.append_digit("4")), 0, 2, 1, 1),
+            (CalcButton("5", lambda: view_model.append_digit("5")), 1, 2, 1, 1),
+            (CalcButton("6", lambda: view_model.append_digit("6")), 2, 2, 1, 1),
+            (
+                CalcButton("×", lambda: view_model.append_operator("*"), ["suggested-action"]),
+                3,
+                2,
+                1,
+                1,
+            ),
+            # Row 3: 1, 2, 3, -
+            (CalcButton("1", lambda: view_model.append_digit("1")), 0, 3, 1, 1),
+            (CalcButton("2", lambda: view_model.append_digit("2")), 1, 3, 1, 1),
+            (CalcButton("3", lambda: view_model.append_digit("3")), 2, 3, 1, 1),
+            (
+                CalcButton("−", lambda: view_model.append_operator("-"), ["suggested-action"]),
+                3,
+                3,
+                1,
+                1,
+            ),
+            # Row 4: 0, ., +
+            (CalcButton("0", lambda: view_model.append_digit("0")), 0, 4, 2, 1),
+            (CalcButton(".", view_model.append_decimal), 2, 4, 1, 1),
+            (
+                CalcButton("+", lambda: view_model.append_operator("+"), ["suggested-action"]),
+                3,
+                4,
+                1,
+                1,
+            ),
+            # Row 5: Equals
+            (CalcButton("=", view_model.calculate, ["suggested-action"]), 0, 5, 4, 1),
+        ]
 
     return grid
 
@@ -263,17 +249,13 @@ def CalculatorView(view_model: CalculatorViewModel) -> Gtk.Widget:
         spacing=0,
     )
 
-    @into(box.append)
-    def _():
-        return ResultsDisplay(view_model)
-
-    @into(box.append)
-    def _():
-        return Gtk.Separator()
-
-    @into(box.append)
-    def _():
-        return Keypad(view_model)
+    @each(into(box.append))
+    def _() -> list[Gtk.Widget]:
+        return [
+            ResultsDisplay(view_model),
+            Gtk.Separator(),
+            Keypad(view_model),
+        ]
 
     return box
 

@@ -1,7 +1,7 @@
 import asyncio
 import threading
-from typing import TypeVar, TypeVarTuple
 from collections.abc import Callable, Iterable
+from typing import TypeVar, TypeVarTuple
 
 InnerT = TypeVar("InnerT")
 OuterT = TypeVar("OuterT")

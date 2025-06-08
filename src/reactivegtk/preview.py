@@ -1,9 +1,11 @@
 import asyncio
-import gi
-from reactivegtk.state import State, MutableState
-from reactivegtk.lifecycle.core import WidgetLifecycle
-from reactivegtk.utils import into, start_event_loop
 from typing import Callable, overload
+
+import gi
+
+from reactivegtk.lifecycle.core import WidgetLifecycle
+from reactivegtk.state import MutableState, State
+from reactivegtk.utils import into, start_event_loop
 
 gi.require_versions(
     {
@@ -11,7 +13,7 @@ gi.require_versions(
         "Adw": "1",
     }
 )
-from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
+from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
 
 class Preview:
@@ -139,30 +141,32 @@ class Preview:
         return wrapped_factory
 
     def _wrap_as_window(
-        self, widget_factory: Callable[[asyncio.AbstractEventLoop], Gtk.Widget], title: str
+        self,
+        widget_factory: Callable[[asyncio.AbstractEventLoop], Gtk.Widget],
+        title: str,
     ) -> Callable[[asyncio.AbstractEventLoop], Gtk.Widget]:
         """Wrap a widget factory to create a window containing the widget."""
-        
+
         def window_factory(event_loop: asyncio.AbstractEventLoop) -> Gtk.Window:
             # Create the widget first
             widget = widget_factory(event_loop)
-            
+
             # If it's already a window, return it as-is
             if isinstance(widget, Gtk.Window):
                 return widget
-            
+
             # Otherwise, create a window and add the widget
             window = Gtk.Window(
                 title=title,
                 default_width=600,
                 default_height=400,
             )
-            
+
             # Add the widget to the window
             window.set_child(widget)
-            
+
             return window
-        
+
         # Preserve the original function's name for registration
         window_factory.__name__ = widget_factory.__name__
         return window_factory
@@ -492,7 +496,12 @@ def Window(app: Adw.Application, preview: Preview) -> Adw.ApplicationWindow:
             toolbar_view.set_content(None)
             # Recreate content
             toolbar_view.set_content(
-                MainContent(selected_widget, show_sidebar, preview.widgets, preview._create_widget)
+                MainContent(
+                    selected_widget,
+                    show_sidebar,
+                    preview.widgets,
+                    preview._create_widget,
+                )
             )
             # Restore selection
             if current_selection and current_selection in preview.widgets:

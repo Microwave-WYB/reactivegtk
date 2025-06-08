@@ -1,6 +1,8 @@
 from collections.abc import Callable, Sequence
 from typing import Any, TypeVar, overload
+
 import gi
+
 from reactivegtk.sequence_binding.core import bind_sequence
 from reactivegtk.state import State
 

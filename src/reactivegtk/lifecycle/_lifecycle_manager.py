@@ -80,7 +80,11 @@ class LifecycleState:
     def mark_cleaned_up(self) -> "LifecycleState":
         """Return new state marked as cleaned up."""
         return LifecycleState(
-            connections=(), effects=(), signals=(), cleanup_callbacks=(), cleaned_up=True
+            connections=(),
+            effects=(),
+            signals=(),
+            cleanup_callbacks=(),
+            cleaned_up=True,
         )
 
     def perform_cleanup(self) -> "LifecycleState":
@@ -106,7 +110,9 @@ class LifecycleState:
 
         return self.mark_cleaned_up()
 
-    def process_signal_specs(self, signals: Sequence[SignalSpec | State]) -> Sequence[SignalSpec]:
+    def process_signal_specs(
+        self, signals: Sequence[SignalSpec | State]
+    ) -> Sequence[SignalSpec]:
         """Convert mixed signal specifications to SignalSpec objects."""
         result = []
         for signal in signals:
@@ -174,7 +180,9 @@ class LifecycleManager:
         """Clean up all managed resources."""
         self.state = self.state.perform_cleanup()
 
-    def create_signal_connection(self, signal_spec: SignalSpec, callback: Callable) -> None:
+    def create_signal_connection(
+        self, signal_spec: SignalSpec, callback: Callable
+    ) -> None:
         """Create a signal connection."""
         self.add_connection(signal_spec.obj, signal_spec.signal_name, callback)
 

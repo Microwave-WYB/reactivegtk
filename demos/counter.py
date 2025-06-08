@@ -39,7 +39,9 @@ def Counter() -> Gtk.Widget:
         @into(hbox.append)
         def _():
             button = Gtk.Button(
-                icon_name="list-remove-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
+                icon_name="list-remove-symbolic",
+                css_classes=["circular"],
+                valign=Gtk.Align.CENTER,
             )
 
             @lifecycle.subscribe(button, "clicked")
@@ -65,7 +67,9 @@ def Counter() -> Gtk.Widget:
         @into(hbox.append)
         def _():
             button = Gtk.Button(
-                icon_name="list-add-symbolic", css_classes=["circular"], valign=Gtk.Align.CENTER
+                icon_name="list-add-symbolic",
+                css_classes=["circular"],
+                valign=Gtk.Align.CENTER,
             )
 
             @lifecycle.subscribe(button, "clicked")

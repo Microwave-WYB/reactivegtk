@@ -1,5 +1,6 @@
 import weakref
 from typing import TYPE_CHECKING
+
 import gi
 
 gi.require_version("GObject", "2.0")

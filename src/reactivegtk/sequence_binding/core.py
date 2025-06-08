@@ -1,12 +1,12 @@
 from collections.abc import Iterator, Sequence
 from functools import singledispatch
-from typing import Callable, TypeVar, overload, Any
+from typing import Any, Callable, TypeVar, overload
 
 import gi
 
-from reactivegtk.state import State
 from reactivegtk.lifecycle import watch
 from reactivegtk.sequence_binding._diff import diff_update
+from reactivegtk.state import State
 
 gi.require_version("Gtk", "4.0")
 gi.require_version("GObject", "2.0")
@@ -19,24 +19,36 @@ KeyT = TypeVar("KeyT", bound=Any)
 
 @overload
 def bind_sequence(
-    container: Gtk.ListBox, items: State[Sequence[ItemT]], *, key_fn: Callable[[ItemT], KeyT] = id
+    container: Gtk.ListBox,
+    items: State[Sequence[ItemT]],
+    *,
+    key_fn: Callable[[ItemT], KeyT] = id,
 ) -> Callable[[Callable[[ItemT], Gtk.ListBoxRow]], None]: ...
 
 
 @overload
 def bind_sequence(
-    container: Gtk.Box, items: State[Sequence[ItemT]], *, key_fn: Callable[[ItemT], KeyT] = id
+    container: Gtk.Box,
+    items: State[Sequence[ItemT]],
+    *,
+    key_fn: Callable[[ItemT], KeyT] = id,
 ) -> Callable[[Callable[[ItemT], Gtk.Widget]], None]: ...
 
 
 @overload
 def bind_sequence(
-    container: Gtk.FlowBox, items: State[Sequence[ItemT]], *, key_fn: Callable[[ItemT], KeyT] = id
+    container: Gtk.FlowBox,
+    items: State[Sequence[ItemT]],
+    *,
+    key_fn: Callable[[ItemT], KeyT] = id,
 ) -> Callable[[Callable[[ItemT], Gtk.FlowBoxChild]], None]: ...
 
 
 def bind_sequence(
-    container: Gtk.Widget, items: State[Sequence[ItemT]], *, key_fn: Callable[[ItemT], KeyT] = id
+    container: Gtk.Widget,
+    items: State[Sequence[ItemT]],
+    *,
+    key_fn: Callable[[ItemT], KeyT] = id,
 ) -> Callable[[Callable[[ItemT], Any]], None]:
     """Bind a sequence state to a GTK container using efficient diff updates."""
 
@@ -100,7 +112,9 @@ def bind_sequence(
                 return adapter.create_widget(item)
 
             def find_widget_by_key(
-                widgets: Sequence[Gtk.Widget], old_items: Sequence[ItemT], target_key: KeyT
+                widgets: Sequence[Gtk.Widget],
+                old_items: Sequence[ItemT],
+                target_key: KeyT,
             ) -> Gtk.Widget | None:
                 """Find widget corresponding to key in old items."""
                 for i, old_item in enumerate(old_items):
