@@ -32,9 +32,9 @@ class TaskViewModel:
     def set_title(self, title: str) -> None:
         self._title.set(title)
 
-    def bind_done_twoway(self, obj: GObject.Object, property_name: str) -> None:
+    def bind_done_twoway(self, obj: GObject.Object, property_name: str) -> GObject.Binding:
         """Bind done state to a GObject property with two-way binding"""
-        self._done.twoway_bind(obj, property_name)
+        return self._done.twoway_bind(obj, property_name)
 
 
 def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) -> Adw.ActionRow:
