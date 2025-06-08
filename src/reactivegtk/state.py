@@ -37,7 +37,7 @@ class State(Generic[T]):
         """Get the current state value."""
         return self._gobject.value
 
-    def map(self, mapper: Callable[[T], R]) -> "State[R]":
+    def map(self, mapper: Callable[[T], R], /) -> "State[R]":
         """Create a new derived state that transforms this state's value."""
         # Create the derived state with initial transformed value
         derived = MutableState(mapper(self.value))
@@ -45,6 +45,31 @@ class State(Generic[T]):
         # Connect to this state's changes
         def on_change(*args):
             derived.set(mapper(self.value))
+
+        connection_id = self._gobject.connect("notify::value", on_change)
+        connection = Connection(self._gobject, connection_id)
+
+        # Track the connection in both states
+        self._connections.add(connection)
+        derived._connections.add(connection)
+
+        # Track the derived state for cleanup
+        self._derived_states.add(derived)
+
+        return derived
+
+    def filter(self, predicate: Callable[[T], bool], /) -> "State[T | None]":
+        """Create a new derived state that only emits values matching the predicate."""
+        # Create the derived state with initial value if it matches
+        initial_value = self.value if predicate(self.value) else None
+        derived = MutableState(initial_value)
+
+        # Connect to this state's changes
+        def on_change(*args):
+            if predicate(self.value):
+                derived.set(self.value)
+            else:
+                derived.set(None)
 
         connection_id = self._gobject.connect("notify::value", on_change)
         connection = Connection(self._gobject, connection_id)
@@ -126,6 +151,3 @@ class MutableState(State[T]):
     def update(self, fn: Callable[[T], T]) -> None:
         """Update the state value using a function."""
         self.set(fn(self.value))
-
-
-
