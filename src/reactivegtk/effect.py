@@ -6,9 +6,7 @@ T = TypeVar("T")
 
 
 class Effect(Generic[T]):
-    def __init__(
-        self, func: Callable[[], Awaitable[T]], event_loop: asyncio.AbstractEventLoop
-    ):
+    def __init__(self, func: Callable[[], Awaitable[T]], event_loop: asyncio.AbstractEventLoop):
         self._func = func
         self._task = None
         self._event_loop = event_loop

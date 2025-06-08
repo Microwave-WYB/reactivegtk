@@ -1,7 +1,9 @@
 import asyncio
 import threading
 from collections.abc import Callable, Iterable
-from typing import TypeVar, TypeVarTuple
+from typing import TypeVar
+
+from typing_extensions import TypeVarTuple, Unpack
 
 InnerT = TypeVar("InnerT")
 OuterT = TypeVar("OuterT")
@@ -34,7 +36,7 @@ Ts = TypeVarTuple = TypeVarTuple("Ts")
 
 def unpack_into(
     outer_fn: Callable[[*Ts], OuterT],
-) -> Callable[[Callable[[], tuple[*Ts]]], Callable[[], tuple[*Ts]]]:
+) -> Callable[[Callable[[], tuple[Unpack[Ts]]]], Callable[[], tuple[Unpack[Ts]]]]:
     """
     Call a function immediately with the unpacked result of decorated function.
 
@@ -49,7 +51,9 @@ def unpack_into(
     [1, 2, 3, 5]
     """
 
-    def decorator(inner_fn: Callable[[], tuple[*Ts]]) -> Callable[[], tuple[*Ts]]:
+    def decorator(
+        inner_fn: Callable[[], tuple[Unpack[Ts]]],
+    ) -> Callable[[], tuple[Unpack[Ts]]]:
         result = inner_fn()
         outer_fn(*result)
         return lambda: result
@@ -100,12 +104,3 @@ def start_event_loop() -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
     thread = threading.Thread(target=event_loop.run_forever, daemon=True)
     thread.start()
     return event_loop, thread
-
-
-if __name__ == "__main__":
-    # Example usage
-    nums = [1, 2, 3]
-
-    @each(into(nums.append))
-    def _():
-        return [4, 5, 6]

@@ -1,5 +1,6 @@
 import gi
-from reactivegtk import WidgetLifecycle, into, MutableState
+
+from reactivegtk import MutableState, WidgetLifecycle, into
 
 gi.require_versions(
     {
@@ -7,7 +8,7 @@ gi.require_versions(
         "Adw": "1",
     }
 )
-from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
+from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
 
 def Counter() -> Gtk.Widget:

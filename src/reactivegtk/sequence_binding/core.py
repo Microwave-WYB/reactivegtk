@@ -130,9 +130,7 @@ def bind_sequence(
                 key_func=key_fn,
                 factory=widget_factory,
                 remove=lambda container_adapter, widget: container_adapter.remove_widget(widget),
-                insert=lambda container_adapter, widget, pos: container_adapter.insert_widget(
-                    widget, pos
-                ),
+                insert=lambda container_adapter, widget, pos: container_adapter.insert_widget(widget, pos),
                 get_container_items=lambda container_adapter: tuple(container_adapter.get_items()),
             )
 

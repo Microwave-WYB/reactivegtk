@@ -56,9 +56,7 @@ def watch(
 
 
 @overload
-def subscribe(
-    widget: Gtk.Widget, signal: Signal[T], /
-) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+def subscribe(widget: Gtk.Widget, signal: Signal[T], /) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
 
 
 @overload
@@ -95,9 +93,7 @@ def subscribe(
 
             return signal_decorator
 
-        case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(
-            signal_name, str
-        ):
+        case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(signal_name, str):
 
             def obj_name_decorator(
                 func: Callable[[Sequence], None],
@@ -114,9 +110,7 @@ def subscribe(
             return obj_name_decorator
 
         case _:
-            raise TypeError(
-                "Invalid signal type. Must be Signal or (GObject.Object, str) sequence."
-            )
+            raise TypeError("Invalid signal type. Must be Signal or (GObject.Object, str) sequence.")
 
 
 WidgetT = TypeVar("WidgetT", bound=Gtk.Widget, covariant=True)
@@ -127,17 +121,13 @@ class WidgetLifecycle(Generic[WidgetT]):
     def __init__(self, widget: WidgetT):
         self.widget: Final[WidgetT] = widget
 
-    def watch(
-        self, state: State[T], init: bool = False
-    ) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
+    def watch(self, state: State[T], init: bool = False) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
         """Create a watcher that can respond to State changes."""
 
         return watch(self.widget, state, init)
 
     @overload
-    def subscribe(
-        self, signal: Signal[T], /
-    ) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+    def subscribe(self, signal: Signal[T], /) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
     @overload
     def subscribe(
         self, obj: GObject.Object, signal_name: str, /

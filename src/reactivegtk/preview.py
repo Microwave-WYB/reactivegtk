@@ -265,9 +265,7 @@ def HeaderBar(
     @into(header_bar.pack_start)
     def _():
         # Sidebar toggle button
-        toggle_button = Gtk.ToggleButton(
-            icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar"
-        )
+        toggle_button = Gtk.ToggleButton(icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar")
 
         # Bind toggle button to sidebar visibility
         @lifecycle.watch(show_sidebar, init=True)
@@ -295,9 +293,7 @@ def HeaderBar(
 
         @lifecycle.watch(selected_widget, init=True)
         def _(_):
-            reload_button.set_sensitive(
-                bool(selected_widget.value and selected_widget.value in widgets)
-            )
+            reload_button.set_sensitive(bool(selected_widget.value and selected_widget.value in widgets))
 
         return reload_button
 
@@ -361,9 +357,7 @@ def Sidebar(selected_widget: MutableState[str], widgets: dict[str, Callable]) ->
     return scrolled
 
 
-def PreviewArea(
-    selected_widget: State[str], create_widget_func: Callable[[str], Gtk.Widget]
-) -> Gtk.Widget:
+def PreviewArea(selected_widget: State[str], create_widget_func: Callable[[str], Gtk.Widget]) -> Gtk.Widget:
     """Create the preview area for displaying widgets."""
     clamp = Adw.Clamp(
         maximum_size=800,
@@ -453,9 +447,7 @@ def MainContent(
     create_widget_func: Callable[[str], Gtk.Widget],
 ) -> Gtk.Widget:
     """Create the main content area with sidebar and preview."""
-    split_view = Adw.OverlaySplitView(
-        min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25
-    )
+    split_view = Adw.OverlaySplitView(min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25)
     lifecycle = WidgetLifecycle(split_view)
 
     # Bind sidebar visibility to state
@@ -472,9 +464,7 @@ def MainContent(
 
 def Window(app: Adw.Application, preview: Preview) -> Adw.ApplicationWindow:
     """Create the main application window."""
-    window = Adw.ApplicationWindow(
-        application=app, default_width=1000, default_height=700, title="Preview Widgets"
-    )
+    window = Adw.ApplicationWindow(application=app, default_width=1000, default_height=700, title="Preview Widgets")
 
     # State to track selected widget
     selected_widget = MutableState[str](list(preview.widgets.keys())[0] if preview.widgets else "")
@@ -508,14 +498,10 @@ def Window(app: Adw.Application, preview: Preview) -> Adw.ApplicationWindow:
                 selected_widget.set(current_selection)
 
         # Add header bar
-        toolbar_view.add_top_bar(
-            HeaderBar(selected_widget, show_sidebar, reload_content, preview.widgets)
-        )
+        toolbar_view.add_top_bar(HeaderBar(selected_widget, show_sidebar, reload_content, preview.widgets))
 
         # Set initial content
-        toolbar_view.set_content(
-            MainContent(selected_widget, show_sidebar, preview.widgets, preview._create_widget)
-        )
+        toolbar_view.set_content(MainContent(selected_widget, show_sidebar, preview.widgets, preview._create_widget))
 
         return toolbar_view
 

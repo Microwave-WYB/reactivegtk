@@ -1,13 +1,15 @@
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+
 import gi
+
 from reactivegtk import (
-    WidgetLifecycle,
-    into,
-    bind_sequence,
-    start_event_loop,
     MutableState,
+    WidgetLifecycle,
+    bind_sequence,
+    into,
+    start_event_loop,
 )
 from reactivegtk.lifecycle import subscribe
 
@@ -17,7 +19,7 @@ gi.require_versions(
         "Adw": "1",
     }
 )
-from gi.repository import Gtk, Adw  # type: ignore # noqa: E402
+from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
 
 @dataclass
@@ -135,9 +137,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     return vbox
 
 
-def CounterBox(
-    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
-) -> Gtk.Widget:
+def CounterBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
     box = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,
         margin_top=12,
@@ -195,9 +195,7 @@ def CounterBox(
     return box
 
 
-def CounterListBox(
-    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
-) -> Gtk.Widget:
+def CounterListBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
     listbox = Gtk.ListBox(
         margin_top=12,
         margin_bottom=12,
@@ -261,9 +259,7 @@ def CounterListBox(
     return listbox
 
 
-def CounterFlowBox(
-    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
-) -> Gtk.Widget:
+def CounterFlowBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
     flowbox = Gtk.FlowBox(
         margin_top=12,
         margin_bottom=12,
@@ -346,9 +342,7 @@ def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
             # Add Counter button in header
             @into(header_bar.pack_start)
             def _():
-                add_button = Gtk.Button(
-                    label="Add Counter", css_classes=["suggested-action"]
-                )
+                add_button = Gtk.Button(label="Add Counter", css_classes=["suggested-action"])
 
                 @subscribe(add_button, add_button, "clicked")
                 def _(_):

@@ -110,9 +110,7 @@ class LifecycleState:
 
         return self.mark_cleaned_up()
 
-    def process_signal_specs(
-        self, signals: Sequence[SignalSpec | State]
-    ) -> Sequence[SignalSpec]:
+    def process_signal_specs(self, signals: Sequence[SignalSpec | State]) -> Sequence[SignalSpec]:
         """Convert mixed signal specifications to SignalSpec objects."""
         result = []
         for signal in signals:
@@ -127,9 +125,7 @@ class LifecycleManager:
     """Manages the lifecycle of widgets using immutable state transitions."""
 
     # Class variable to track lifecycle managers
-    _instances: weakref.WeakKeyDictionary[Gtk.Widget, "LifecycleManager"] = (
-        weakref.WeakKeyDictionary()
-    )
+    _instances: weakref.WeakKeyDictionary[Gtk.Widget, "LifecycleManager"] = weakref.WeakKeyDictionary()
 
     def __init__(self, widget: Gtk.Widget):
         self._widget_ref = weakref.ref(widget)
@@ -141,9 +137,7 @@ class LifecycleManager:
 
         widget.connect("destroy", cleanup_callback)
 
-    def add_connection(
-        self, obj: GObject.Object, signal_name: str, callback: Callable
-    ) -> Connection:
+    def add_connection(self, obj: GObject.Object, signal_name: str, callback: Callable) -> Connection:
         """Add a managed connection."""
         connection_id = obj.connect(signal_name, callback)
         connection = Connection(obj, connection_id)
@@ -180,9 +174,7 @@ class LifecycleManager:
         """Clean up all managed resources."""
         self.state = self.state.perform_cleanup()
 
-    def create_signal_connection(
-        self, signal_spec: SignalSpec, callback: Callable
-    ) -> None:
+    def create_signal_connection(self, signal_spec: SignalSpec, callback: Callable) -> None:
         """Create a signal connection."""
         self.add_connection(signal_spec.obj, signal_spec.signal_name, callback)
 
