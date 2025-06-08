@@ -80,6 +80,93 @@ class Preview:
         self.widgets[name.__name__] = name
         return name
 
+    @overload
+    def as_window(
+        self, func: Callable[[asyncio.AbstractEventLoop], Gtk.Widget], /
+    ) -> Callable[[asyncio.AbstractEventLoop], Gtk.Widget]:
+        """
+        Register a widget factory function as a window decorator.
+
+        Usage:
+            preview = Preview()
+
+            @preview.as_window
+            def MyWidget(event_loop) -> Gtk.Widget: ...
+        """
+        ...
+
+    @overload
+    def as_window(
+        self, name: str, /
+    ) -> Callable[
+        [Callable[[asyncio.AbstractEventLoop], Gtk.Widget]],
+        Callable[[asyncio.AbstractEventLoop], Gtk.Widget],
+    ]:
+        """
+        Register a widget factory function as a window with a specific name.
+
+        Usage:
+            preview = Preview()
+
+            @preview.as_window("MyWidget")
+            def my_widget_factory(event_loop) -> Gtk.Widget: ...
+        """
+        ...
+
+    def as_window(
+        self, name: Callable[[asyncio.AbstractEventLoop], Gtk.Widget] | str, /
+    ) -> (
+        Callable[[asyncio.AbstractEventLoop], Gtk.Widget]
+        | Callable[
+            [Callable[[asyncio.AbstractEventLoop], Gtk.Widget]],
+            Callable[[asyncio.AbstractEventLoop], Gtk.Widget],
+        ]
+    ):
+        if isinstance(name, str):
+            # If a string is provided, return a decorator that registers the widget as window
+            def decorator(
+                widget_factory: Callable[[asyncio.AbstractEventLoop], Gtk.Widget],
+            ) -> Callable[[asyncio.AbstractEventLoop], Gtk.Widget]:
+                wrapped_factory = self._wrap_as_window(widget_factory, name)
+                self.widgets[name] = wrapped_factory
+                return wrapped_factory
+
+            return decorator
+
+        # If a function is provided, wrap it as window and register it directly
+        wrapped_factory = self._wrap_as_window(name, name.__name__)
+        self.widgets[name.__name__] = wrapped_factory
+        return wrapped_factory
+
+    def _wrap_as_window(
+        self, widget_factory: Callable[[asyncio.AbstractEventLoop], Gtk.Widget], title: str
+    ) -> Callable[[asyncio.AbstractEventLoop], Gtk.Widget]:
+        """Wrap a widget factory to create a window containing the widget."""
+        
+        def window_factory(event_loop: asyncio.AbstractEventLoop) -> Gtk.Window:
+            # Create the widget first
+            widget = widget_factory(event_loop)
+            
+            # If it's already a window, return it as-is
+            if isinstance(widget, Gtk.Window):
+                return widget
+            
+            # Otherwise, create a window and add the widget
+            window = Gtk.Window(
+                title=title,
+                default_width=600,
+                default_height=400,
+            )
+            
+            # Add the widget to the window
+            window.set_child(widget)
+            
+            return window
+        
+        # Preserve the original function's name for registration
+        window_factory.__name__ = widget_factory.__name__
+        return window_factory
+
     def _create_widget(self, widget_name: str) -> Gtk.Widget:
         """Create a widget from the factory, using cache if available."""
 
