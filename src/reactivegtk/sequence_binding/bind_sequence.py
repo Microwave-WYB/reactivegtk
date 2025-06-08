@@ -5,7 +5,7 @@ from typing import Callable, TypeVar, overload, Any
 import gi
 
 from reactivegtk.state import State
-from reactivegtk.lifecycle import watch
+from reactivegtk.lifecycle import watch, LifecycleManager
 from reactivegtk.sequence_binding.diff import diff_update
 
 gi.require_version("Gtk", "4.0")
@@ -59,7 +59,13 @@ def bind_sequence(
 
             def remove_widget(self, widget: Gtk.Widget) -> None:
                 """Remove widget from container."""
+                # Trigger explicit cleanup for the widget's lifecycle manager
+                if widget in LifecycleManager._instances:
+                    lifecycle_manager = LifecycleManager._instances[widget]
+                    lifecycle_manager.trigger_cleanup()
+                
                 remove_widget(self.container, widget)
+                
                 # Remove from our tracking dict
                 key_to_remove = None
                 for key, tracked_widget in self._widget_by_key.items():

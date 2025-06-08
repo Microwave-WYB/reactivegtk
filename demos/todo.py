@@ -26,6 +26,10 @@ def TaskWidget(task: TaskModel, on_remove: Callable[[TaskModel], None]) -> Adw.A
     row = Adw.ActionRow(title=task.title.value)
     lifecycle = WidgetLifecycle(row)
 
+    @lifecycle.on_cleanup()
+    def _():
+        print(f"TaskWidget: Destroying task '{task.title.value}'")
+
     @into(row.add_prefix)
     def _():
         checkbox = Gtk.CheckButton()

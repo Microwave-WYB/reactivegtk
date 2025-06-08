@@ -43,8 +43,8 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     def _(_):
         print("Counter widget unrealized")
 
-    @lifecycle.subscribe(vbox, "destroy")
-    def _(_):
+    @lifecycle.on_cleanup()
+    def _():
         print("Counter widget destroyed")
 
     @lifecycle.effect(model.auto, event_loop=event_loop)

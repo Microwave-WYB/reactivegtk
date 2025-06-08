@@ -2,7 +2,6 @@ from typing import Sequence
 import gi
 from reactivegtk import (
     State,
-    WidgetLifecycle,
     bind_sequence,
     into,
     Preview,

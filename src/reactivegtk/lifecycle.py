@@ -30,7 +30,9 @@ class LifecycleManager:
         self._widget_ref = weakref.ref(widget)
         self._connections: list[Connection] = []
         self._effects: list["Effect"] = []
+        self._signals: list["Signal"] = []
         self._cleanup_callbacks: list[Callable[[], None]] = []
+        self._cleaned_up = False
 
         # Connect to destroy signal for definitive cleanup
         # Using weak reference to avoid circular dependency
@@ -62,29 +64,48 @@ class LifecycleManager:
         """Add a managed side effect."""
         self._effects.append(side_effect)
 
+    def add_signal(self, signal: "Signal"):
+        """Add a managed signal."""
+        self._signals.append(signal)
+
     def add_cleanup_callback(self, callback: Callable[[], None]):
         """Add a cleanup callback."""
         self._cleanup_callbacks.append(callback)
 
+    def trigger_cleanup(self):
+        """Manually trigger cleanup."""
+        if not self._cleaned_up:
+            self.cleanup()
+
     def cleanup(self):
         """Clean up all managed resources."""
-        # Cancel all side effects
-        for side_effect in self._effects:
-            side_effect.cancel()
-        self._effects.clear()
+        if self._cleaned_up:
+            return
 
-        # Disconnect all connections
-        for connection in self._connections:
-            connection.disconnect()
-        self._connections.clear()
+        self._cleaned_up = True
 
-        # Run cleanup callbacks
+        # Run cleanup callbacks first
         for callback in self._cleanup_callbacks:
             try:
                 callback()
             except Exception as e:
                 print(f"Error in cleanup callback: {e}")
         self._cleanup_callbacks.clear()
+
+        # Cancel all side effects
+        for side_effect in self._effects:
+            side_effect.cancel()
+        self._effects.clear()
+
+        # Cleanup all signals
+        for signal in self._signals:
+            signal.cleanup()
+        self._signals.clear()
+
+        # Disconnect all connections
+        for connection in self._connections:
+            connection.disconnect()
+        self._connections.clear()
 
     @classmethod
     def get_instance(cls, widget: Gtk.Widget) -> "LifecycleManager":
@@ -191,6 +212,7 @@ def subscribe(
                 connection = signal_instance.subscribe(func)
                 signal_instance._connections.add(connection)
                 lifecycle_manager.add_connection_ref(connection)
+                lifecycle_manager.add_signal(signal_instance)
                 return func
 
             return obj_name_decorator
@@ -237,3 +259,11 @@ class WidgetLifecycle(Generic[WidgetT]):
     ) -> Callable[[Callable[[], Awaitable[T]]], Effect[T]]:
         """Create and launch an effect that can respond to GTK signals."""
         return effect(self.widget, event_loop, *signals)
+
+    def on_cleanup(self) -> Callable[[Callable[[], None]], Callable[[], None]]:
+        """Subscribe to cleanup events for this widget."""
+        def decorator(func: Callable[[], None]) -> Callable[[], None]:
+            lifecycle_manager = LifecycleManager.get_instance(self.widget)
+            lifecycle_manager.add_cleanup_callback(func)
+            return func
+        return decorator

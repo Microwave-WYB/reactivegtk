@@ -22,6 +22,7 @@ class Preview:
     def __init__(self):
         self.widgets: dict[str, Callable[[asyncio.AbstractEventLoop], Gtk.Widget]] = {}
         self.event_loop, _ = start_event_loop()
+        self._widget_cache: dict[str, Gtk.Widget] = {}
 
     @overload
     def __call__(
@@ -80,7 +81,19 @@ class Preview:
         return name
 
     def _create_widget(self, widget_name: str) -> Gtk.Widget:
-        """Create a widget from the factory."""
+        """Create a widget from the factory, using cache if available."""
+        
+        # Check cache first (except for windows which should always create launch buttons)
+        if widget_name in self._widget_cache:
+            cached_widget = self._widget_cache[widget_name]
+            # Verify the cached widget is still valid (not destroyed)
+            try:
+                # Try to access a property to check if widget is still valid
+                _ = cached_widget.get_visible()
+                return cached_widget
+            except Exception:
+                # Widget is no longer valid, remove from cache
+                del self._widget_cache[widget_name]
 
         widget_factory = self.widgets[widget_name]
         widget = widget_factory(self.event_loop)
@@ -89,8 +102,13 @@ class Preview:
         if isinstance(widget, Gtk.Window):
             # Don't hold onto the original window - destroy it immediately
             widget.destroy()
-            return self._create_window_launch_button(widget_name)
+            launch_button = self._create_window_launch_button(widget_name)
+            # Cache the launch button, not the window
+            self._widget_cache[widget_name] = launch_button
+            return launch_button
         
+        # Cache non-window widgets
+        self._widget_cache[widget_name] = widget
         return widget
 
     def _create_window_launch_button(self, widget_name: str) -> Gtk.Widget:
@@ -293,6 +311,11 @@ def PreviewArea(
                     preview_widget = create_widget_func(selected_widget.value)
 
                     if preview_widget:
+                        # If widget has a parent, remove it first (for cached widgets)
+                        current_parent = preview_widget.get_parent()
+                        if current_parent:
+                            preview_widget.unparent()
+                        
                         preview_box.append(preview_widget)
                     else:
                         raise Exception("Failed to create widget")
@@ -375,6 +398,8 @@ def Window(app: Adw.Application, preview: Preview) -> Adw.ApplicationWindow:
         toolbar_view = Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.RAISED)
 
         def reload_content():
+            # Clear widget cache to force recreation
+            preview._widget_cache.clear()
             # Remember current selection
             current_selection = selected_widget.value
             # Clear current content
