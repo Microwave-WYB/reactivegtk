@@ -70,27 +70,25 @@ def TaskList(
     tasks: State[Sequence[TaskViewModel]],
     on_remove: Callable[[TaskViewModel], None],
 ) -> Gtk.Widget:
-    return ui(
-        Conditional(
-            tasks.map(bool),
-            true=ReactiveSequence(
-                Gtk.ListBox(
-                    selection_mode=Gtk.SelectionMode.NONE,
-                    css_classes=["boxed-list"],
-                    margin_top=4,
-                    margin_start=4,
-                    margin_end=4,
-                    margin_bottom=12,
-                ),
-                tasks,
-                lambda task: TaskWidget(task, on_remove=on_remove),
+    return Conditional(
+        tasks.map(bool),
+        true=ReactiveSequence(
+            Gtk.ListBox(
+                selection_mode=Gtk.SelectionMode.NONE,
+                css_classes=["boxed-list"],
+                margin_top=4,
+                margin_start=4,
+                margin_end=4,
+                margin_bottom=12,
             ),
-            false=Gtk.Label(
-                label="No tasks yet",
-                css_classes=["dim-label"],
-                margin_top=48,
-                margin_bottom=48,
-            ),
+            tasks,
+            lambda task: TaskWidget(task, on_remove=on_remove),
+        ),
+        false=Gtk.Label(
+            label="No tasks yet",
+            css_classes=["dim-label"],
+            margin_top=48,
+            margin_bottom=48,
         ),
     )
 
