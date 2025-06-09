@@ -133,15 +133,7 @@ class LifecycleManager:
         self._widget_ref = weakref.ref(widget)
         self.state = LifecycleState()
 
-        # Use weak reference to self to avoid reference cycle
-        weak_self = weakref.ref(self)
-
-        def cleanup_callback(*args):
-            manager = weak_self()
-            if manager is not None:
-                manager.cleanup()
-
-        widget.connect("destroy", cleanup_callback)
+        widget.connect("destroy", lambda *_: self.cleanup())
 
     def add_connection(
         self, obj: GObject.Object, signal_name: str, callback: Callable
