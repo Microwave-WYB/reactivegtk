@@ -46,7 +46,7 @@ def Counter() -> Gtk.Widget:
             )
 
             @lifecycle.subscribe(button, "clicked")
-            def _(_):
+            def _(*_):
                 count.update(lambda x: x - 1)
 
             return button
@@ -60,7 +60,7 @@ def Counter() -> Gtk.Widget:
             )
 
             @lifecycle.subscribe(button, "clicked")
-            def _(_):
+            def _(*_):
                 count.set(0)
 
             return button
@@ -74,7 +74,7 @@ def Counter() -> Gtk.Widget:
             )
 
             @lifecycle.subscribe(button, "clicked")
-            def _(_):
+            def _(*_):
                 count.update(lambda x: x + 1)
 
             return button

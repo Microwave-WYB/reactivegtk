@@ -60,7 +60,7 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
                     css_classes=["circular", "destructive-action"],
                     tooltip_text="Remove task",
                 ),
-                lifecycle.subscribe(remove_button, "clicked")(lambda _: on_remove(task)),
+                lifecycle.subscribe(remove_button, "clicked")(lambda *_: on_remove(task)),
             )
         ),
     )
@@ -71,9 +71,8 @@ def TaskList(
     on_remove: Callable[[TaskViewModel], None],
 ) -> Gtk.Widget:
     return ui(
-        overlay := Gtk.Overlay(),
-        overlay.set_child(
-            Conditional(
+        Gtk.Overlay(
+            child=Conditional(
                 tasks.map(bool),
                 true=ReactiveSequence(
                     Gtk.ListBox(
@@ -176,7 +175,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                                 ),
                                 view_model.bind_entry_text_twoway(entry, "text"),
                                 lifecycle.subscribe(entry, "activate")(
-                                    lambda _: do(
+                                    lambda *_: do(
                                         view_model.add_task(view_model.entry_text.value),
                                         view_model.clear_entry_text(),
                                     )
@@ -192,7 +191,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                                     add_button, "sensitive"
                                 ),
                                 lifecycle.subscribe(add_button, "clicked")(
-                                    lambda _: do(
+                                    lambda *_: do(
                                         view_model.add_task(view_model.entry_text.value),
                                         view_model.clear_entry_text(),
                                     )

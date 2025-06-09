@@ -1,10 +1,9 @@
 import asyncio
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable
 from typing import Any, Final, Generic, TypeVar, overload
 
 import gi
 
-from reactivegtk.connection import Connection
 from reactivegtk.effect import Effect
 from reactivegtk.lifecycle._lifecycle_manager import LifecycleManager
 from reactivegtk.signal import Signal
@@ -56,20 +55,22 @@ def watch(
 
 
 @overload
-def subscribe(widget: Gtk.Widget, signal: Signal[T], /) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
+def subscribe(
+    widget: Gtk.Widget, signal: Signal[T], /
+) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
 
 
 @overload
 def subscribe(
     widget: Gtk.Widget, obj: GObject.Object, signal_name: str, /
-) -> Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]: ...
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
 
 def subscribe(
     widget: Gtk.Widget, *args
 ) -> (
     Callable[[Callable[[T], Any]], Callable[[T], Any]]
-    | Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]
+    | Callable[[Callable[..., Any]], Callable[..., Any]]
 ):
     """Subscribe to a topic with proper lifecycle management."""
 
@@ -89,8 +90,8 @@ def subscribe(
         case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(signal_name, str):
 
             def obj_name_decorator(
-                func: Callable[[Sequence], Any],
-            ) -> Callable[[Sequence], Any]:
+                func: Callable[..., Any],
+            ) -> Callable[..., Any]:
                 """Decorator to create a subscription that can be called with the object."""
                 lifecycle_manager = LifecycleManager.get_instance(widget)
                 signal_instance = Signal.from_obj_and_name(obj, signal_name)
@@ -102,7 +103,9 @@ def subscribe(
             return obj_name_decorator
 
         case _:
-            raise TypeError("Invalid signal type. Must be Signal or (GObject.Object, str) sequence.")
+            raise TypeError(
+                "Invalid signal type. Must be Signal or (GObject.Object, str) sequence."
+            )
 
 
 WidgetT = TypeVar("WidgetT", bound=Gtk.Widget, covariant=True)
@@ -113,23 +116,27 @@ class WidgetLifecycle(Generic[WidgetT]):
     def __init__(self, widget: WidgetT):
         self.widget: Final[WidgetT] = widget
 
-    def watch(self, state: State[T], init: bool = False) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
+    def watch(
+        self, state: State[T], init: bool = False
+    ) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]:
         """Create a watcher that can respond to State changes."""
 
         return watch(self.widget, state, init)
 
     @overload
-    def subscribe(self, signal: Signal[T], /) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
+    def subscribe(
+        self, signal: Signal[T], /
+    ) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
     @overload
     def subscribe(
         self, obj: GObject.Object, signal_name: str, /
-    ) -> Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]: ...
+    ) -> Callable[[Callable[..., Any]], Callable[..., Any]]: ...
 
     def subscribe(
         self, *args
     ) -> (
         Callable[[Callable[[T], Any]], Callable[[T], Any]]
-        | Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]
+        | Callable[[Callable[..., Any]], Callable[..., Any]]
     ):
         """Subscribe to a signal with proper lifecycle management."""
         return subscribe(self.widget, *args)

@@ -29,7 +29,7 @@ def HelloWorld():
         name.twoway_bind(entry, "text")
 
         @lifecycle.subscribe(entry, "activate")
-        def _(_):
+        def _(*_):
             print(f"Entry activated with text: {name.value}")
 
         return entry

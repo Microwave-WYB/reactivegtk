@@ -38,11 +38,11 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     lifecycle = WidgetLifecycle(vbox)
 
     @lifecycle.subscribe(vbox, "realize")
-    def _(_):
+    def _(*_):
         print("Counter widget realized")
 
     @lifecycle.subscribe(vbox, "unrealize")
-    def _(_):
+    def _(*_):
         print("Counter widget unrealized")
 
     @lifecycle.on_cleanup()
@@ -74,7 +74,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
             )
 
             @lifecycle.subscribe(button, "clicked")
-            def _(_):
+            def _(*_):
                 model.count.update(lambda x: x - 1)
 
             return button
@@ -103,7 +103,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
             )
 
             @lifecycle.subscribe(button, "clicked")
-            def _(_):
+            def _(*_):
                 model.count.update(lambda x: x + 1)
 
             return button
@@ -115,7 +115,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         button = Gtk.Button(label="Reset", css_classes=["destructive-action"])
 
         @lifecycle.subscribe(button, "clicked")
-        def _(_):
+        def _(*_):
             model.count.set(0)
 
         return button
@@ -125,7 +125,7 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
         button = Gtk.Button()
 
         @lifecycle.subscribe(button, "clicked")
-        def _(_):
+        def _(*_):
             model.auto.set(not model.auto.value)
 
         @lifecycle.watch(model.auto, init=True)
@@ -137,7 +137,9 @@ def Counter(model: CounterModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.W
     return vbox
 
 
-def CounterBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
+def CounterBox(
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+) -> Gtk.Widget:
     box = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,
         margin_top=12,
@@ -180,7 +182,7 @@ def CounterBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio
             )
 
             @subscribe(remove_button, remove_button, "clicked")
-            def _(_):
+            def _(*_):
                 current_models = list(models.value)
                 try:
                     current_models.remove(item)
@@ -195,7 +197,9 @@ def CounterBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio
     return box
 
 
-def CounterListBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
+def CounterListBox(
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+) -> Gtk.Widget:
     listbox = Gtk.ListBox(
         margin_top=12,
         margin_bottom=12,
@@ -247,7 +251,7 @@ def CounterListBox(models: MutableState[Sequence[CounterModel]], event_loop: asy
             )
 
             @lifecycle.subscribe(remove_button, "clicked")
-            def _(_):
+            def _(*_):
                 current_models = list(models.value)
                 current_models.remove(item)
                 models.set(current_models)
@@ -259,7 +263,9 @@ def CounterListBox(models: MutableState[Sequence[CounterModel]], event_loop: asy
     return listbox
 
 
-def CounterFlowBox(models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
+def CounterFlowBox(
+    models: MutableState[Sequence[CounterModel]], event_loop: asyncio.AbstractEventLoop
+) -> Gtk.Widget:
     flowbox = Gtk.FlowBox(
         margin_top=12,
         margin_bottom=12,
@@ -310,7 +316,7 @@ def CounterFlowBox(models: MutableState[Sequence[CounterModel]], event_loop: asy
             )
 
             @child_lifecycle.subscribe(remove_button, "clicked")
-            def _(_):
+            def _(*_):
                 current_models = list(models.value)
                 try:
                     current_models.remove(item)
@@ -345,7 +351,7 @@ def Window(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindow:
                 add_button = Gtk.Button(label="Add Counter", css_classes=["suggested-action"])
 
                 @subscribe(add_button, add_button, "clicked")
-                def _(_):
+                def _(*_):
                     current_models = list(models.value)
                     current_models.append(CounterModel())
                     models.set(current_models)

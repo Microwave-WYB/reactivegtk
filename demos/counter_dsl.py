@@ -43,7 +43,7 @@ def Counter() -> Gtk.Widget:
                             valign=Gtk.Align.CENTER,
                         ),
                         lifecycle.subscribe(button, "clicked")(
-                            lambda _: count.update(lambda x: x - 1)
+                            lambda *_: count.update(lambda x: x - 1)
                         ),
                     ),
                     ui(
@@ -52,7 +52,7 @@ def Counter() -> Gtk.Widget:
                             css_classes=["circular", "destructive-action"],
                             valign=Gtk.Align.CENTER,
                         ),
-                        lifecycle.subscribe(button, "clicked")(lambda _: count.set(0)),
+                        lifecycle.subscribe(button, "clicked")(lambda *_: count.set(0)),
                     ),
                     ui(
                         button := Gtk.Button(
@@ -61,7 +61,7 @@ def Counter() -> Gtk.Widget:
                             valign=Gtk.Align.CENTER,
                         ),
                         lifecycle.subscribe(button, "clicked")(
-                            lambda _: count.update(lambda x: x + 1)
+                            lambda *_: count.update(lambda x: x + 1)
                         ),
                     ),
                 ),

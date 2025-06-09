@@ -52,7 +52,10 @@ class Signal(Generic[T]):
         """Subscribe to messages on this topic."""
 
         def on_message(obj, message):
-            callback(message)
+            if isinstance(message, tuple):
+                callback(*message)
+            else:
+                callback(message)
 
         connection_id = self._object.connect("message", on_message)
         connection = Connection(self._object, connection_id)

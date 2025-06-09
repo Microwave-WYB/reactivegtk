@@ -1,4 +1,5 @@
-from typing import Callable, Generic, TypeVar, Any
+from typing import Any, Callable, Generic, TypeVar
+
 from typing_extensions import TypeVarTuple, Unpack
 
 T = TypeVar("T")

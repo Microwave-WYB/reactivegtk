@@ -221,7 +221,7 @@ class Preview:
             )
 
             @lifecycle.subscribe(launch_button, "clicked")
-            def _(_):
+            def _(*_):
                 # Always create a fresh window instance
                 widget_factory = self.widgets[widget_name]
                 fresh_window = widget_factory(self.event_loop)
@@ -273,7 +273,7 @@ def HeaderBar(
             toggle_button.set_active(show)
 
         @lifecycle.subscribe(toggle_button, "toggled")
-        def _(_):
+        def _(*_):
             show_sidebar.set(toggle_button.get_active())
 
         return toggle_button
@@ -288,7 +288,7 @@ def HeaderBar(
         )
 
         @lifecycle.subscribe(reload_button, "clicked")
-        def _(_):
+        def _(*_):
             reload_callback()
 
         @lifecycle.watch(selected_widget, init=True)
@@ -344,7 +344,7 @@ def Sidebar(selected_widget: MutableState[str], widgets: dict[str, Callable]) ->
 
         # Handle row selection
         @lifecycle.subscribe(listbox, "row-selected")
-        def _(_):
+        def _(*_):
             selected_row = listbox.get_selected_row()
             if selected_row:
                 for name, row in widget_rows.items():
