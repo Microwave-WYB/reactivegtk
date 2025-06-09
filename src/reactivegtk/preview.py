@@ -3,10 +3,10 @@ from typing import Callable, overload
 
 import gi
 
+from reactivegtk.dsl import apply, do, ui
 from reactivegtk.lifecycle.core import WidgetLifecycle
 from reactivegtk.state import MutableState, State
 from reactivegtk.utils import start_event_loop
-from reactivegtk.dsl import ui, apply, do
 
 gi.require_versions(
     {
