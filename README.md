@@ -24,9 +24,64 @@ pip install git+https://github.com/Microwave-WYB/reactivegtk.git
 - GTK4
 - Libadwaita
 
-## Quick Start: Hello World
+## Three Approaches to GTK UI Development
 
-Here's a minimal hello world app to get you started:
+ReactiveGTK supports three different patterns for building UIs, from traditional GTK to fully declarative. Each approach has its place depending on your needs and preferences.
+
+### 1. Traditional GTK (Object-Oriented, Imperative)
+
+Classic GTK widget development with manual state management:
+
+```python
+import gi
+gi.require_versions({"Gtk": "4.0", "Adw": "1"})
+from gi.repository import Adw, Gtk
+
+class HelloWorldWidget(Gtk.Box):
+    def __init__(self):
+        super().__init__(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=12,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+        )
+
+        self.name = ""
+
+        # WARNING: Circular reference memory leak!
+        # HelloWorldWidget → self.entry → signal connection → self._on_entry_* → HelloWorldWidget
+        # This widget will never be garbage collected without manual cleanup
+        self.entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
+        self.entry.connect("activate", self._on_entry_activate)
+        self.entry.connect("changed", self._on_entry_changed)
+        self.append(self.entry)
+
+        self.label = Gtk.Label(css_classes=["title-1"])
+        self._update_label()
+        self.append(self.label)
+
+    def _on_entry_activate(self, entry: Gtk.Entry) -> None:
+        print(f"Entry activated with text: {self.name}")
+
+    def _on_entry_changed(self, entry: Gtk.Entry) -> None:
+        self.name = entry.get_text()
+        self._update_label()
+
+    def _update_label(self) -> None:
+        text = f"Hello, {self.name}!" if self.name else "Hello, ...!"
+        self.label.set_text(text)
+```
+
+**Problems with Traditional Approach:**
+- ❌ **Memory leaks** from circular references
+- ❌ **Manual state synchronization** between widgets
+- ❌ **Boilerplate code** for signal connections and cleanup
+- ❌ **Error-prone** lifecycle management
+- ❌ **Imperative** - you must tell GTK exactly what to do
+
+### 2. @into Pattern (Reduced Boilerplate)
+
+ReactiveGTK with functional decorators:
 
 ```python
 import gi
@@ -34,7 +89,6 @@ from reactivegtk import MutableState, WidgetLifecycle, into
 
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Gtk, Adw
-
 
 def HelloWorld():
     # Create reactive state
@@ -55,7 +109,6 @@ def HelloWorld():
     @into(box.append)
     def _():
         entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
-
         name.twoway_bind(entry, "text")
 
         @lifecycle.subscribe(entry, "activate")
@@ -72,9 +125,67 @@ def HelloWorld():
         return label
 
     return box
+```
+
+**Benefits of @into Pattern:**
+- ✅ **Automatic lifecycle management** - no memory leaks
+- ✅ **Reactive state** - UI updates automatically
+- ✅ **Two-way data binding** - no manual synchronization
+- ✅ **Less boilerplate** than traditional GTK
+- ✅ **Functional approach** with decorators
+
+### 3. DSL Pattern (Declarative)
+
+Fully declarative UI with domain-specific language:
+
+```python
+import gi
+from reactivegtk import MutableState, WidgetLifecycle
+from reactivegtk.dsl import ui, apply
+
+gi.require_versions({"Gtk": "4.0", "Adw": "1"})
+from gi.repository import Gtk, Adw
+
+def HelloWorld():
+    # Create reactive state
+    name = MutableState("")
+
+    return ui(
+        box := Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=12,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+        ),
+        lifecycle := WidgetLifecycle(box),
+        apply(box.append).foreach(
+            ui(
+                entry := Gtk.Entry(placeholder_text="Enter your name...", width_request=200),
+                name.twoway_bind(entry, "text"),
+                lifecycle.subscribe(entry, "activate")(
+                    lambda *_: print(f"Entry activated with text: {name.value}")
+                ),
+            ),
+            ui(
+                label := Gtk.Label(css_classes=["title-1"]),
+                name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label"),
+            ),
+        ),
+    )
+```
+
+**Benefits of DSL Pattern:**
+- ✅ **All benefits of @into pattern** plus:
+- ✅ **Most concise** syntax
+- ✅ **Declarative** - describe what you want, not how
+- ✅ **Visual hierarchy** - structure is immediately clear
+- ✅ **Functional composition** style
+- ✅ **Modern UI patterns** (like SwiftUI, Jetpack Compose)
+
+### App Setup
 
 
-# Create and run the app
+```python
 def App():
     app = Adw.Application(application_id="com.example.HelloWorld")
 
@@ -86,6 +197,24 @@ def App():
 
     return app
 
+if __name__ == "__main__":
+    App().run([])
+```
+
+**DSL pattern:**
+```python
+def App():
+    return ui(
+        app := Adw.Application(application_id="com.example.HelloWorld"),
+        app.connect(
+            "activate",
+            lambda *_: do(
+                window := Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK"),
+                window.set_content(HelloWorld()),
+                window.present(),
+            ),
+        ),
+    )
 
 if __name__ == "__main__":
     App().run([])
@@ -94,6 +223,17 @@ if __name__ == "__main__":
 This results:
 
 ![Hello Example](assets/hello.gif)
+
+## Why ReactiveGTK?
+
+ReactiveGTK solves fundamental problems with traditional GTK development:
+
+1. **Memory Safety**: Automatic lifecycle management prevents circular reference leaks
+2. **Reactive State**: UI automatically updates when data changes
+3. **Less Code**: Declarative patterns reduce boilerplate significantly
+4. **Type Safety**: Full type hints and checking support
+5. **Modern Patterns**: Familiar to developers from React, SwiftUI, etc.
+6. **Choose Your Style**: Use traditional, @into, or DSL patterns as needed
 
 ## Core Concepts
 
@@ -147,7 +287,7 @@ class MyComponent:
 
 ### 3. Widget Lifecycle
 
-Manage widget events, cleanup, and effects:
+Manage widget events, cleanup, and effects while preventing memory leaks:
 
 ```python
 from reactivegtk import WidgetLifecycle
@@ -170,6 +310,8 @@ def on_count_change(new_value):
 def cleanup():
     print("Widget destroyed")
 ```
+
+**Key Benefit**: `WidgetLifecycle` automatically manages signal connections using weak references, preventing the circular reference memory leaks common in traditional GTK development. When you use `lifecycle.subscribe()`, the connection won't prevent the widget from being garbage collected, unlike direct GTK signal connections which create strong reference cycles.
 
 ### 4. Declarative UI with `@into`
 
@@ -409,7 +551,7 @@ Check out the `demos/` directory for complete examples:
 
 - **[`counter.py`](demos/counter.py)**: Simple counter with increment/decrement
 - **[`counter_dsl.py`](demos/counter_dsl.py)**: Counter using DSL syntax
-- **[`todo.py`](demos/todo.py)**: Todo app with dynamic lists  
+- **[`todo.py`](demos/todo.py)**: Todo app with dynamic lists
 - **[`todo_dsl.py`](demos/todo_dsl.py)**: Todo app using DSL syntax
 - **[`multi_counter.py`](demos/multi_counter.py)**: Multiple counters with async auto-increment
 - **[`hello.py`](demos/hello.py)**: Simple hello world example

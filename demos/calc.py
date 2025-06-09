@@ -52,7 +52,13 @@ class CalculatorViewModel:
 
         current = self.current_expression.value
 
-        parts = current.replace("+", "|").replace("-", "|").replace("*", "|").replace("/", "|").split("|")
+        parts = (
+            current.replace("+", "|")
+            .replace("-", "|")
+            .replace("*", "|")
+            .replace("/", "|")
+            .split("|")
+        )
         if parts and "." not in parts[-1]:
             if not current or current[-1] in "+-*/":
                 self.current_expression.update(lambda expr: expr + "0.")
@@ -131,7 +137,9 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.Widget:
     return box
 
 
-def CalcButton(text: str, on_click, css_classes=None, width_request=None, icon_name=None) -> Gtk.Button:
+def CalcButton(
+    text: str, on_click, css_classes=None, width_request=None, icon_name=None
+) -> Gtk.Button:
     if icon_name:
         button = Gtk.Button(
             icon_name=icon_name,
@@ -155,7 +163,7 @@ def CalcButton(text: str, on_click, css_classes=None, width_request=None, icon_n
     lifecycle = WidgetLifecycle(button)
 
     @lifecycle.subscribe(button, "clicked")
-    def _(_):
+    def _(*_):
         on_click()
 
     return button
