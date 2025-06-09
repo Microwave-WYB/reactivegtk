@@ -109,6 +109,14 @@ def subscribe(
             )
 
 
+def cleanup(
+    widget: Gtk.Widget,
+) -> None:
+    """Trigger cleanup for the widget's lifecycle manager."""
+    if LifecycleManager.has_instance(widget):
+        LifecycleManager.get_instance(widget).trigger_cleanup()
+
+
 WidgetT = TypeVar("WidgetT", bound=Gtk.Widget, covariant=True)
 T = TypeVar("T")
 
@@ -157,3 +165,7 @@ class WidgetLifecycle(Generic[WidgetT]):
             return func
 
         return decorator
+
+    def cleanup(self) -> None:
+        """Trigger cleanup for the widget's lifecycle manager."""
+        cleanup(self.widget)

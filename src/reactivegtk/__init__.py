@@ -1,6 +1,6 @@
 from reactivegtk.connection import Connection
 from reactivegtk.effect import Effect
-from reactivegtk.lifecycle import WidgetLifecycle, effect, watch
+from reactivegtk.lifecycle import WidgetLifecycle, cleanup, effect, watch
 from reactivegtk.preview import Preview
 from reactivegtk.sequence_binding.core import bind_sequence
 from reactivegtk.signal import Signal
@@ -13,6 +13,7 @@ __all__ = [
     "MutableState",
     "Connection",
     "Signal",
+    "cleanup",
     "effect",
     "watch",
     "WidgetLifecycle",
