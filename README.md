@@ -9,31 +9,29 @@ A reactive UI framework for GTK4 applications in Python, inspired by modern reac
 
 ## Features
 
-- **Reactive State Management**: Automatic UI updates when state changes
-- **Declarative UI**: Build UIs with functional, composable components
-- **Type Safety**: Full type hints and type checking support
-- **Efficient Updates**: Only re-render what actually changed
-- **Data Binding**: Two-way binding between state and UI elements
-- **GTK4 + Libadwaita**: Modern GTK4 widgets with Adwaita styling
-- **Async Support**: Built-in async/await support for effects
+- 🔄 **Reactive State Management**: Automatic UI updates when state changes
+- 🔗 **Two-way Data Binding**: Keep UI and state in sync effortlessly
+- 📝 **Declarative Syntax**: Build UIs using a clean, intuitive DSL
+- 🧬 **Component Lifecycle**: Automatic memory management and cleanup
+- 🔌 **Type Safety**: Full type hints support
+- 🎯 **Zero Dependencies**: Only GTK4 and Python 3.10+
 
 ## Installation
 
 ```bash
-# with pip
-pip install git+https://github.com/Microwave-WYB/reactivegtk.git
+pip install reactive-gtk
 ```
 
-**Requirements:**
-- Python 3.10+
-- GTK4
-- Libadwaita
+## Two Approaches to GTK UI Development
 
-## Three Approaches to GTK UI Development
-
-ReactiveGTK supports three different patterns for building UIs, from traditional GTK to fully declarative. Each approach has its place depending on your needs and preferences.
+> [!NOTE]
+> The DSL Pattern (Approach 2) is the recommended and modern way to build ReactiveGTK applications.
+> The traditional approach is shown for comparison only.
 
 ### 1. Traditional GTK (Object-Oriented, Imperative)
+
+> [!CAUTION]
+> This approach is shown for historical context only. Use the DSL Pattern for new applications.
 
 Classic GTK widget development with manual state management:
 
@@ -84,64 +82,9 @@ class HelloWorldWidget(Gtk.Box):
 - ❌ **Error-prone** lifecycle management
 - ❌ **Imperative** - you must tell GTK exactly what to do
 
-### 2. @into Pattern (Reduced Boilerplate)
+### 2. DSL Pattern (Declarative)
 
-ReactiveGTK with functional decorators:
-
-```python
-import gi
-from reactivegtk import MutableState, WidgetLifecycle, into
-
-gi.require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Gtk, Adw
-
-def HelloWorld():
-    # Create reactive state
-    name = MutableState("")
-
-    # Create container widget
-    box = Gtk.Box(
-        orientation=Gtk.Orientation.VERTICAL,
-        spacing=12,
-        halign=Gtk.Align.CENTER,
-        valign=Gtk.Align.CENTER,
-    )
-
-    # Widget lifecycle management
-    lifecycle = WidgetLifecycle(box)
-
-    # Add entry for name input
-    @into(box.append)
-    def _():
-        entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
-        name.twoway_bind(entry, "text")
-
-        @lifecycle.subscribe(entry, "activate")
-        def _(*_):
-            print(f"Entry activated with text: {name.value}")
-
-        return entry
-
-    # Add label that automatically updates when name changes
-    @into(box.append)
-    def _():
-        label = Gtk.Label(css_classes=["title-1"])
-        name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label")
-        return label
-
-    return box
-```
-
-**Benefits of @into Pattern:**
-- ✅ **Automatic lifecycle management** - no memory leaks
-- ✅ **Reactive state** - UI updates automatically
-- ✅ **Two-way data binding** - no manual synchronization
-- ✅ **Less boilerplate** than traditional GTK
-- ✅ **Functional approach** with decorators
-
-### 3. DSL Pattern (Declarative)
-
-Fully declarative UI with domain-specific language:
+The recommended way to build ReactiveGTK applications. This pattern provides a clean, declarative syntax that makes UI construction intuitive and maintainable:
 
 ```python
 import gi
@@ -180,65 +123,72 @@ def HelloWorld():
 ```
 
 **Benefits of DSL Pattern:**
-- ✅ **All benefits of @into pattern** plus:
-- ✅ **Most concise** syntax
-- ✅ **Declarative** - describe what you want, not how
-- ✅ **Visual hierarchy** - structure is immediately clear
-- ✅ **Functional composition** style
-- ✅ **Modern UI patterns** (like SwiftUI, Jetpack Compose)
+- ✅ **Declarative syntax** - describe what you want, not how to do it
+- ✅ **Automatic lifecycle management** - no memory leaks
+- ✅ **Reactive state** - UI updates automatically
+- ✅ **Two-way data binding** - no manual synchronization
+- ✅ **Composable components** - build complex UIs from simple pieces
+- ✅ **Type-safe** - catch errors at compile time
 
 ### App Setup
 
+The basic application setup is the same for both approaches:
 
 ```python
-def App():
-    app = Adw.Application(application_id="com.example.HelloWorld")
+import gi
+gi.require_versions({"Gtk": "4.0", "Adw": "1"})
+from gi.repository import Gtk, Adw
 
-    @lambda f: app.connect("activate", f)
-    def _(*_):
-        window = Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK")
-        window.set_content(HelloWorld())
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="com.example.HelloWorld")
+        self.connect("activate", self._on_activate)
+
+    def _on_activate(self, app):
+        window = Adw.ApplicationWindow(application=app)
+        window.set_content(HelloWorld())  # Use either approach here
         window.present()
 
-    return app
-
-if __name__ == "__main__":
-    App().run([])
+app = App()
+app.run(None)
 ```
 
-**DSL pattern:**
+For more complex applications with routing and multiple windows:
+
 ```python
+from reactivegtk import Router
+
 def App():
-    return ui(
-        app := Adw.Application(application_id="com.example.HelloWorld"),
-        app.connect(
-            "activate",
-            lambda *_: do(
-                window := Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK"),
-                window.set_content(HelloWorld()),
-                window.present(),
-            ),
-        ),
-    )
+    router = Router()
 
-if __name__ == "__main__":
-    App().run([])
+    @router.route("/")
+    def home():
+        return HelloWorld()
+
+    @router.route("/about")
+    def about():
+        return AboutView()
+
+    @router.route("/settings")
+    def settings():
+        return SettingsView()
+
+    return router
+
+app = Adw.Application(application_id="com.example.HelloWorld")
+app.connect("activate", lambda app: App().run(app))
+app.run(None)
 ```
-
-This results:
-
-![Hello Example](assets/hello.gif)
 
 ## Why ReactiveGTK?
 
-ReactiveGTK solves fundamental problems with traditional GTK development:
+GTK is a powerful toolkit for building native Linux applications, but its traditional object-oriented, imperative approach can lead to complex, hard-to-maintain code. ReactiveGTK brings modern reactive programming patterns to GTK development, making it easier to:
 
-1. **Memory Safety**: Automatic lifecycle management prevents circular reference leaks
-2. **Reactive State**: UI automatically updates when data changes
-3. **Less Code**: Declarative patterns reduce boilerplate significantly
-4. **Type Safety**: Full type hints and checking support
-5. **Modern Patterns**: Familiar to developers from React, SwiftUI, etc.
-6. **Choose Your Style**: Use traditional, @into, or DSL patterns as needed
+- Build complex, stateful UIs without getting lost in callback hell
+- Keep UI and state in sync without manual event handling
+- Avoid common memory leaks and lifecycle issues
+- Write more maintainable, testable code
+- Create reusable, composable components
 
 ## Core Concepts
 
@@ -316,227 +266,190 @@ def cleanup():
     print("Widget destroyed")
 ```
 
-**Key Benefit**: `WidgetLifecycle` automatically manages signal connections using weak references, preventing the circular reference memory leaks common in traditional GTK development. When you use `lifecycle.subscribe()`, the connection won't prevent the widget from being garbage collected, unlike direct GTK signal connections which create strong reference cycles.
+**Key Benefit**: `WidgetLifecycle` automatically manages signal connections using weak references, preventing the circular reference memory leaks common in traditional GTK development.
 
-### 4. Declarative UI with `@into`
+### 4. Declarative UI
 
-The `@into` decorator provides a clean way to build UI hierarchies:
+ReactiveGTK provides a declarative Domain-Specific Language (DSL) for building UIs. This allows you to describe your interface structure in a clear, hierarchical manner:
 
 ```python
-from reactivegtk import into
+from reactivegtk.dsl import ui, apply
 
-@into(parent.append)
-def _():
-    child = Gtk.Button(label="Child")
-    # ... configure child ...
-    return child
+def MyApp():
+    count = MutableState(0)
+
+    return ui(
+        box := Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=12
+        ),
+        lifecycle := WidgetLifecycle(box),
+        apply(box.append).foreach(
+            ui(
+                label := Gtk.Label(),
+                count.map(lambda x: f"Count: {x}").bind(label, "label")
+            ),
+            ui(
+                button := Gtk.Button(label="Increment"),
+                lifecycle.subscribe(button, "clicked")(
+                    lambda *_: count.update(lambda x: x + 1)
+                )
+            )
+        )
+    )
 ```
+
+The DSL approach:
+- ✅ Eliminates boilerplate code
+- ✅ Makes the UI structure immediately apparent
+- ✅ Uses Python's standard syntax in a natural way
+- ✅ Provides automatic lifecycle management
+- ✅ Enables composable and reusable components
 
 ### 5. Sequence Binding
 
-Automatically manage lists of widgets that sync with collections:
+Bind lists and sequences to automatically update the UI when items are added or removed:
 
 ```python
-from reactivegtk import bind_sequence
-from collections.abc import Sequence
+from reactivegtk import MutableSequence, State
 
-# Must use State[Sequence[T]] type annotation for type checking
-items = MutableState[Sequence[str]](["Apple", "Banana", "Cherry"])
-listbox = Gtk.ListBox()
+items = MutableSequence[str]([])
+items.append("New Item")  # UI automatically updates
 
-@bind_sequence(listbox, items)
-def create_item(item: str) -> Gtk.Widget:
-    return Gtk.Label(label=item)
+def create_item(text: str):
+    return ui(
+        Gtk.Label(label=text)
+    )
 
-# Adding/removing items using immutable patterns
-items.update(lambda lst: [*lst, "Date"])  # Append item
-items.update(lambda lst: [item for item in lst if item != "Apple"])  # Remove item
+items.map(create_item).bind_foreach(box)
 ```
-
-**Note**: Sequences must be treated immutably to ensure state updates trigger properly. Use unpacking (`[*lst, new_item]`) and list comprehensions rather than mutating methods like `.append()` or `.remove()`.
 
 ### 6. Async Effects
 
-Run async operations that respond to state changes:
+Handle asynchronous operations with reactive effects:
 
 ```python
 import asyncio
-from reactivegtk import start_event_loop
+from reactivegtk import async_effect
 
-# Start async event loop
-event_loop, thread = start_event_loop()
-
-@lifecycle.watch(auto_increment, init=True)
-@lifecycle.effect(event_loop)
-async def auto_counter():
-    while auto_increment.value:
+@async_effect
+async def auto_counter(set_count):
+    while True:
         await asyncio.sleep(1)
-        count.update(lambda x: x + 1)
+        set_count(lambda x: x + 1)
 ```
 
-## Advanced Example: Todo App
+## Advanced Example: Counter
 
-```python
-from dataclasses import dataclass, field
-from collections.abc import Sequence
-from reactivegtk import MutableState, State, WidgetLifecycle, into
-
-@dataclass(frozen=True)
-class Task:
-    title: MutableState[str]
-    done: MutableState[bool] = field(default_factory=lambda: MutableState(False))
-
-class TodoApp:
-    def __init__(self):
-        self.tasks = MutableState[Sequence[Task]]([])
-        self.new_task_text = MutableState("")
-
-    def add_task(self, text: str):
-        if text.strip():
-            task = Task(MutableState(text.strip()))
-            self.tasks.update(lambda tasks: [*tasks, task])
-            self.new_task_text.set("")
-
-    def remove_task(self, task: Task):
-        self.tasks.update(lambda tasks: [t for t in tasks if t is not task])
-
-def TodoView(app: TodoApp) -> Gtk.Widget:
-    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-    lifecycle = WidgetLifecycle(box)
-
-    # Add task entry
-    @into(box.append)
-    def _():
-        entry = Gtk.Entry(placeholder_text="Add a task...")
-        app.new_task_text.twoway_bind(entry, "text")
-
-        @lifecycle.subscribe(entry, "activate")
-        def _(*_):
-            app.add_task(app.new_task_text.value)
-
-        return entry
-
-    # Task list
-    @into(box.append)
-    def _():
-        listbox = Gtk.ListBox()
-
-        @bind_sequence(listbox, app.tasks)
-        def create_task_widget(task: Task) -> Gtk.Widget:
-            row = Gtk.ListBoxRow()
-            task_box = Gtk.Box(spacing=12)
-            row.set_child(task_box)
-
-            # Checkbox
-            checkbox = Gtk.CheckButton()
-            task.done.twoway_bind(checkbox, "active")
-            task_box.append(checkbox)
-
-            # Label
-            label = Gtk.Label()
-            task.title.bind(label, "label")
-            task_box.append(label)
-
-            # Remove button
-            remove_btn = Gtk.Button(icon_name="user-trash-symbolic")
-            task_lifecycle = WidgetLifecycle(row)
-
-            @task_lifecycle.subscribe(remove_btn, "clicked")
-            def _(*_):
-                app.remove_task(task)
-
-            task_box.append(remove_btn)
-            return row
-
-        return listbox
-
-    return box
-```
+A complete counter application demonstrating reactive state, events, and async effects:
 
 ## Preview System
 
-ReactiveGTK includes a built-in preview system for rapid prototyping:
+ReactiveGTK includes a hot-reload preview system for rapid development:
 
 ```python
-from reactivegtk import Preview
-
-preview = Preview()
-
-@preview("Counter")
-def _(_) -> Gtk.Widget:
+@preview
+def counter_preview():
     return Counter()
+```
 
-@preview("TodoApp")
-def _(_) -> Gtk.Widget:
-    return TodoView(TodoApp())
+Run the preview server:
 
-preview.run()  # Shows preview window with component selector
+```bash
+python -m reactivegtk.preview examples/counter.py
 ```
 
 ## API Reference
 
 ### State Classes
 
-- **`State[T]`**: Immutable reactive state
-- **`MutableState[T]`**: Mutable reactive state with `.set()` and `.update()` methods
+- `State[T]`: Base class for all reactive state
+- `MutableState[T]`: Mutable reactive state that can be changed
+- `DerivedState[T]`: Read-only state derived from other state
+- `MutableSequence[T]`: Reactive list that can be modified
 
 ### State Methods
 
-- **`.map(fn)`**: Transform state value
-- **`.bind(widget, property)`**: One-way binding to widget property
-- **`.twoway_bind(widget, property)`**: Two-way binding with widget property
-- **`.watch(callback)`**: Subscribe to state changes
+- `state.value`: Get current value
+- `state.set(value)`: Set new value (MutableState only)
+- `state.update(fn)`: Update value with function (MutableState only)
+- `state.map(fn)`: Create derived state
+- `state.bind(widget, prop)`: One-way binding to widget property
+- `state.twoway_bind(widget, prop)`: Two-way binding (MutableState only)
 
 ### Lifecycle Management
 
-- **`WidgetLifecycle(widget)`**: Manages widget lifecycle
-- **`.subscribe(widget, signal)`**: Subscribe to widget signals
-- **`.watch(state)`**: Watch state changes
-- **`.effect(event_loop)`**: Run async effects
-- **`.on_cleanup()`**: Register cleanup callbacks
+- `WidgetLifecycle`: Manages widget lifecycle and cleanup
+- `lifecycle.subscribe(widget, signal)`: Subscribe to widget signals
+- `lifecycle.watch(state)`: Watch state changes
+- `lifecycle.on_cleanup()`: Register cleanup functions
+- `lifecycle.dispose()`: Manual cleanup
 
 ### Utilities
 
-- **`@into(method)`**: Declarative UI builder decorator
-- **`bind_sequence(container, state, key_fn?)`**: Bind collections to UI
-- **`start_event_loop()`**: Start async event loop for effects
+- `async_effect`: Create async effects
+- `derived`: Create derived state
+- `untracked`: Access state without tracking
 
 ### DSL (Domain Specific Language)
 
-ReactiveGTK includes a DSL for more declarative UI construction:
+- `ui`: Create UI components
+- `apply`: Apply functions to widgets
+- `foreach`: Create multiple widgets
+- `once`: Apply one-time setup
+
+Example counter component using all major features:
 
 ```python
-from reactivegtk.dsl import ui, apply
-
-def Counter() -> Gtk.Widget:
+def Counter():
     count = MutableState(0)
+    doubled = count.map(lambda x: x * 2)
 
     return ui(
         box := Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
-            spacing=6,
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.CENTER,
+            spacing=12,
+            margin_start=12,
+            margin_end=12,
+            margin_top=12,
+            margin_bottom=12,
         ),
         lifecycle := WidgetLifecycle(box),
+
+        # Auto-increment effect
+        async_effect(lambda: auto_counter(count.set)),
+
         apply(box.append).foreach(
+            # Counter display
             ui(
                 label := Gtk.Label(css_classes=["title-1"]),
-                count.map(str).bind(label, "label"),
+                count.map(lambda x: f"Count: {x}").bind(label, "label"),
             ),
+
+            # Doubled value
             ui(
-                hbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12),
-                apply(hbox.append).foreach(
+                label2 := Gtk.Label(),
+                doubled.map(lambda x: f"Doubled: {x}").bind(label2, "label"),
+            ),
+
+            # Control buttons
+            ui(
+                buttons := Gtk.Box(
+                    orientation=Gtk.Orientation.HORIZONTAL,
+                    spacing=6,
+                    halign=Gtk.Align.CENTER,
+                ),
+                apply(buttons.append).foreach(
                     ui(
-                        button := Gtk.Button(icon_name="list-remove-symbolic"),
+                        button := Gtk.Button(label="Increment"),
                         lifecycle.subscribe(button, "clicked")(
-                            lambda *_: count.update(lambda x: x - 1)
+                            lambda *_: count.update(lambda x: x + 1)
                         ),
                     ),
                     ui(
-                        button := Gtk.Button(icon_name="list-add-symbolic"),
-                        lifecycle.subscribe(button, "clicked")(
-                            lambda *_: count.update(lambda x: x + 1)
+                        button2 := Gtk.Button(label="Reset"),
+                        lifecycle.subscribe(button2, "clicked")(
+                            lambda *_: count.set(0)
                         ),
                     ),
                 ),
@@ -545,33 +458,25 @@ def Counter() -> Gtk.Widget:
     )
 ```
 
-**DSL Functions:**
-- **`ui(target, *actions)`**: Execute actions and return the target widget
-- **`apply(fn).foreach(*items)`**: Apply a function to multiple items
-- **`do(*actions, ret=value)`**: Execute actions and return a value
-
 ## Examples
 
-Check out the `demos/` directory for complete examples:
+Check out the `demos` directory for more complete examples:
 
-- **[`counter.py`](demos/counter.py)**: Simple counter with increment/decrement
-- **[`counter_dsl.py`](demos/counter_dsl.py)**: Counter using DSL syntax
-- **[`todo.py`](demos/todo.py)**: Todo app with dynamic lists
-- **[`todo_dsl.py`](demos/todo_dsl.py)**: Todo app using DSL syntax
-- **[`multi_counter.py`](demos/multi_counter.py)**: Multiple counters with async auto-increment
-- **[`hello.py`](demos/hello.py)**: Simple hello world example
+- Hello World (`demos/hello.py`)
+- Counter (`demos/counter.py`)
+- To-Do List (`demos/todo.py`)
+- Multiple Auto-incrementing Counters (`demos/multi_counter.py`)
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Contributions are welcome! Please read our contributing guidelines before submitting pull requests.
 
 ## License
 
-This project is under [MIT License](LICENSE)
+MIT License - see LICENSE for details
 
 ## Requirements
 
-- Python ≥ 3.10
-- PyGObject ≥ 3.52.3
-- GTK4
-- Libadwaita
+- Python 3.10+
+- GTK 4.0+
+- PyGObject
