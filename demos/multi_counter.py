@@ -5,7 +5,7 @@ from typing import Callable
 
 import gi
 
-from reactivegtk import MutableState, State, WidgetLifecycle, start_event_loop, effect
+from reactivegtk import MutableState, State, WidgetLifecycle, start_event_loop
 from reactivegtk.widgets import Conditional, ReactiveSequence
 from reactivegtk.dsl import ui, do, apply
 
@@ -50,7 +50,7 @@ def CounterWidget(
         # Lifecycle logging
         lifecycle.subscribe(vbox, "realize")(lambda *_: print("Counter widget realized")),
         lifecycle.subscribe(vbox, "unrealize")(lambda *_: print("Counter widget unrealized")),
-        lifecycle.on_cleanup()(lambda: print("Counter widget destroyed")),
+        lifecycle.on_cleanup(lambda: print("Counter widget destroyed")),
         # Counter controls and buttons
         apply(vbox.append).foreach(
             # Counter controls

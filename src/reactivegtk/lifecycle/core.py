@@ -156,15 +156,16 @@ class WidgetLifecycle(Generic[WidgetT]):
         """Create a launcher function that ignores arguments and launches the effect."""
         return effect(event_loop)
 
-    def on_cleanup(self) -> Callable[[Callable[[], None]], Callable[[], None]]:
+    def on_cleanup(
+        self,
+        func: Callable[[], Any],
+    ) -> Callable[[], Any]:
         """Subscribe to cleanup events for this widget."""
 
-        def decorator(func: Callable[[], None]) -> Callable[[], None]:
-            lifecycle_manager = LifecycleManager.get_instance(self.widget)
-            lifecycle_manager.add_cleanup_callback(func)
-            return func
+        lifecycle_manager = LifecycleManager.get_instance(self.widget)
+        lifecycle_manager.add_cleanup_callback(func)
 
-        return decorator
+        return func
 
     def cleanup(self) -> None:
         """Trigger cleanup for the widget's lifecycle manager."""
