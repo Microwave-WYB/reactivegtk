@@ -187,5 +187,6 @@ class LifecycleManager:
     def get_instance(cls, widget: Gtk.Widget) -> "LifecycleManager":
         """Get the lifecycle manager instance for a widget."""
         if widget not in cls._instances:
-            cls._instances[widget] = cls(widget)
+            manager = cls(widget)
+            cls._instances[widget] = manager
         return cls._instances[widget]
