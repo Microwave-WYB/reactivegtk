@@ -1,5 +1,5 @@
 import weakref
-from typing import Callable, Generic, TypeVar, cast
+from typing import Any, Callable, Generic, TypeVar, cast
 
 import gi
 
@@ -102,7 +102,7 @@ class State(Generic[T]):
 
     def watch(
         self,
-        callback: Callable[[T], None],
+        callback: Callable[[T], Any],
         init: bool = False,
     ) -> "Connection":
         """Subscribe to changes in this state."""

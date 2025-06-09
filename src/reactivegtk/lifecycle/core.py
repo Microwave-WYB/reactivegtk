@@ -56,20 +56,20 @@ def watch(
 
 
 @overload
-def subscribe(widget: Gtk.Widget, signal: Signal[T], /) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+def subscribe(widget: Gtk.Widget, signal: Signal[T], /) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
 
 
 @overload
 def subscribe(
     widget: Gtk.Widget, obj: GObject.Object, signal_name: str, /
-) -> Callable[[Callable[[Sequence], None]], Callable[[Sequence], None]]: ...
+) -> Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]: ...
 
 
 def subscribe(
     widget: Gtk.Widget, *args
 ) -> (
-    Callable[[Callable[[T], None]], Callable[[T], None]]
-    | Callable[[Callable[[Sequence], None]], Callable[[Sequence], None]]
+    Callable[[Callable[[T], Any]], Callable[[T], Any]]
+    | Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]
 ):
     """Subscribe to a topic with proper lifecycle management."""
 
@@ -77,17 +77,10 @@ def subscribe(
         case (Signal(),):
             signal = args[0]
 
-            def signal_decorator(func: Callable[[T], None]) -> Callable[[T], None]:
+            def signal_decorator(func: Callable[[T], Any]) -> Callable[[T], Any]:
                 """Decorator to create a subscription that can be called with the object."""
                 lifecycle_manager = LifecycleManager.get_instance(widget)
                 connection = signal.subscribe(func)
-
-                def on_message(obj, message):
-                    func(message)
-
-                connection_id = signal._object.connect("message", on_message)
-                connection = Connection(signal._object, connection_id)
-                signal._connections.add(connection)
                 lifecycle_manager.add_connection_ref(connection)
                 return func
 
@@ -96,13 +89,12 @@ def subscribe(
         case (obj, signal_name) if isinstance(obj, GObject.Object) and isinstance(signal_name, str):
 
             def obj_name_decorator(
-                func: Callable[[Sequence], None],
-            ) -> Callable[[Sequence], None]:
+                func: Callable[[Sequence], Any],
+            ) -> Callable[[Sequence], Any]:
                 """Decorator to create a subscription that can be called with the object."""
                 lifecycle_manager = LifecycleManager.get_instance(widget)
                 signal_instance = Signal.from_obj_and_name(obj, signal_name)
                 connection = signal_instance.subscribe(func)
-                signal_instance._connections.add(connection)
                 lifecycle_manager.add_connection_ref(connection)
                 lifecycle_manager.add_signal(signal_instance)
                 return func
@@ -127,17 +119,17 @@ class WidgetLifecycle(Generic[WidgetT]):
         return watch(self.widget, state, init)
 
     @overload
-    def subscribe(self, signal: Signal[T], /) -> Callable[[Callable[[T], None]], Callable[[T], None]]: ...
+    def subscribe(self, signal: Signal[T], /) -> Callable[[Callable[[T], Any]], Callable[[T], Any]]: ...
     @overload
     def subscribe(
         self, obj: GObject.Object, signal_name: str, /
-    ) -> Callable[[Callable[[Sequence], None]], Callable[[Sequence], None]]: ...
+    ) -> Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]: ...
 
     def subscribe(
         self, *args
     ) -> (
-        Callable[[Callable[[T], None]], Callable[[T], None]]
-        | Callable[[Callable[[Sequence], None]], Callable[[Sequence], None]]
+        Callable[[Callable[[T], Any]], Callable[[T], Any]]
+        | Callable[[Callable[[Sequence], Any]], Callable[[Sequence], Any]]
     ):
         """Subscribe to a signal with proper lifecycle management."""
         return subscribe(self.widget, *args)

@@ -1,5 +1,5 @@
 import weakref
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
 import gi
 
@@ -48,7 +48,7 @@ class Signal(Generic[T]):
             # Always emit custom signal with message
             self._object.emit("message", message)
 
-    def subscribe(self, callback: Callable[[T], None]) -> "Connection":
+    def subscribe(self, callback: Callable[[T], Any]) -> "Connection":
         """Subscribe to messages on this topic."""
 
         def on_message(obj, message):
