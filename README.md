@@ -1,5 +1,10 @@
 # ReactiveGTK
 
+> [!WARNING]
+> This project is in very early development stage and is not ready for production use.
+> Breaking changes should be expected at any time. APIs, architecture, and core concepts
+> may change significantly without notice. Use at your own risk.
+
 A reactive UI framework for GTK4 applications in Python, inspired by modern reactive programming patterns. Build dynamic, stateful GTK applications with declarative syntax and automatic UI updates.
 
 ## Features
