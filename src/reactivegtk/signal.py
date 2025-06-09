@@ -30,15 +30,6 @@ class Signal(Generic[T]):
     def __init__(self):
         self._object: _SignalData[T] = _SignalData()
         self._connections: weakref.WeakSet[Connection] = weakref.WeakSet()
-        self._external_connections: weakref.WeakSet[Connection] = weakref.WeakSet()
-
-    @staticmethod
-    def from_obj_and_name(obj: GObject.Object, signal_name: str) -> "Signal[tuple]":
-        signal = Signal[tuple]()
-        connection_id = obj.connect(signal_name, lambda *args: signal.emit(args))
-        connection = Connection(obj, connection_id)
-        signal._external_connections.add(connection)
-        return signal
 
     def emit(self, message: T) -> None:
         """Publish a message to all subscribers."""
@@ -77,9 +68,3 @@ class Signal(Generic[T]):
             if connection.is_valid():
                 connection.disconnect()
         self._connections.clear()
-
-        # Disconnect all external connections (from from_obj_and_name)
-        for connection in list(self._external_connections):
-            if connection.is_valid():
-                connection.disconnect()
-        self._external_connections.clear()
