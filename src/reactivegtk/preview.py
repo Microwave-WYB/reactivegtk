@@ -11,7 +11,7 @@ from reactivegtk.utils import start_event_loop
 from reactivegtk.widgets import Conditional
 
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
-from gi.repository import Adw, Gtk
+from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
 
 class PreviewViewModel:
