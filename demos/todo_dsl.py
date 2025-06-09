@@ -50,7 +50,7 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
                     valign=Gtk.Align.CENTER,
                 ),
                 task.bind_done_twoway(checkbox, "active"),
-            )
+            ),
         ),
         row.add_suffix(
             ui(
@@ -61,7 +61,7 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
                     tooltip_text="Remove task",
                 ),
                 lifecycle.subscribe(remove_button, "clicked")(lambda *_: on_remove(task)),
-            )
+            ),
         ),
     )
 
@@ -92,7 +92,7 @@ def TaskList(
                     margin_top=48,
                     margin_bottom=48,
                 ),
-            )
+            ),
         ),
     )
 
@@ -178,7 +178,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                                     lambda *_: do(
                                         view_model.add_task(view_model.entry_text.value),
                                         view_model.clear_entry_text(),
-                                    )
+                                    ),
                                 ),
                             ),
                             ui(
@@ -212,7 +212,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                         ),
                     ),
                 ),
-            )
+            ),
         ),
     )
 
@@ -234,7 +234,7 @@ def TodoWindow() -> Adw.Window:
                     Adw.HeaderBar(
                         title_widget=Adw.WindowTitle(title="Todo App"),
                         show_start_title_buttons=False,
-                    )
+                    ),
                 ),
                 toolbar_view.set_content(TodoView(view_model)),
                 toolbar_view.add_bottom_bar(
@@ -243,9 +243,9 @@ def TodoWindow() -> Adw.Window:
                         view_model.stats.map(
                             lambda stats: f"Done: {stats[0]} / Total: {stats[1]}"
                         ).bind(stats_label, "label"),
-                    )
+                    ),
                 ),
-            )
+            ),
         ),
     )
 
@@ -268,7 +268,7 @@ if __name__ == "__main__":
                 margin_end=4,
             ),
             listbox.append(
-                TaskWidget(sample_task, lambda task: print(f"Would remove: {task.title.value}"))
+                TaskWidget(sample_task, lambda task: print(f"Would remove: {task.title.value}")),
             ),
         )
 

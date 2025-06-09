@@ -27,7 +27,7 @@ def HelloWorld():
                     lambda *_: do(
                         print(f"Entry activated with text: {name.value}"),
                         print("Entry was activated!"),
-                    )
+                    ),
                 ),
             ),
             ui(

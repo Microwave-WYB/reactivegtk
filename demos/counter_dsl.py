@@ -80,14 +80,14 @@ def Window(app: Adw.Application) -> Adw.ApplicationWindow:
                     Adw.HeaderBar(
                         title_widget=Adw.WindowTitle(title="Counter App"),
                         show_start_title_buttons=False,
-                    )
+                    ),
                 ),
                 view.set_content(
                     Gtk.WindowHandle(
                         child=Counter(),
                     ),
                 ),
-            )
+            ),
         ),
         window.set_default_size(300, 400),
     )
