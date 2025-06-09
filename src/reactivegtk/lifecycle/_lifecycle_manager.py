@@ -125,19 +125,27 @@ class LifecycleManager:
     """Manages the lifecycle of widgets using immutable state transitions."""
 
     # Class variable to track lifecycle managers
-    _instances: weakref.WeakKeyDictionary[Gtk.Widget, "LifecycleManager"] = weakref.WeakKeyDictionary()
+    _instances: weakref.WeakKeyDictionary[Gtk.Widget, "LifecycleManager"] = (
+        weakref.WeakKeyDictionary()
+    )
 
     def __init__(self, widget: Gtk.Widget):
         self._widget_ref = weakref.ref(widget)
         self.state = LifecycleState()
 
-        # Connect to destroy signal for definitive cleanup
+        # Use weak reference to self to avoid reference cycle
+        weak_self = weakref.ref(self)
+
         def cleanup_callback(*args):
-            self.cleanup()
+            manager = weak_self()
+            if manager is not None:
+                manager.cleanup()
 
         widget.connect("destroy", cleanup_callback)
 
-    def add_connection(self, obj: GObject.Object, signal_name: str, callback: Callable) -> Connection:
+    def add_connection(
+        self, obj: GObject.Object, signal_name: str, callback: Callable
+    ) -> Connection:
         """Add a managed connection."""
         connection_id = obj.connect(signal_name, callback)
         connection = Connection(obj, connection_id)

@@ -4,6 +4,7 @@ from typing import Any, Final, Generic, TypeVar, overload
 
 import gi
 
+from reactivegtk.connection import Connection
 from reactivegtk.effect import Effect
 from reactivegtk.lifecycle._lifecycle_manager import LifecycleManager
 from reactivegtk.signal import Signal
@@ -94,10 +95,10 @@ def subscribe(
             ) -> Callable[..., Any]:
                 """Decorator to create a subscription that can be called with the object."""
                 lifecycle_manager = LifecycleManager.get_instance(widget)
-                signal_instance = Signal.from_obj_and_name(obj, signal_name)
-                connection = signal_instance.subscribe(func)
+                connection_id = obj.connect(signal_name, func)
+                connection = Connection(obj, connection_id)
                 lifecycle_manager.add_connection_ref(connection)
-                lifecycle_manager.add_signal(signal_instance)
+
                 return func
 
             return obj_name_decorator
