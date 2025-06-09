@@ -63,7 +63,7 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
         )
 
         @lifecycle.subscribe(remove_button, "clicked")
-        def _(_):
+        def _(*_):
             on_remove(task)
 
         return remove_button
@@ -186,7 +186,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                 view_model.bind_entry_text_twoway(entry, "text")
 
                 @lifecycle.subscribe(entry, "activate")
-                def _(_):
+                def _(*_):
                     view_model.add_task(view_model.entry_text.value)
                     view_model.clear_entry_text()
 
@@ -203,7 +203,7 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                 view_model.entry_text.map(lambda t: bool(t.strip())).bind(add_button, "sensitive")
 
                 @lifecycle.subscribe(add_button, "clicked")
-                def _(_):
+                def _(*_):
                     view_model.add_task(view_model.entry_text.value)
                     view_model.clear_entry_text()
 
@@ -258,7 +258,9 @@ def TodoWindow() -> Adw.Window:
         @into(toolbar_view.add_bottom_bar)
         def _():
             stats_label = Gtk.Label(css_classes=["caption"])
-            view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(stats_label, "label")
+            view_model.stats.map(lambda stats: f"Done: {stats[0]} / Total: {stats[1]}").bind(
+                stats_label, "label"
+            )
             return stats_label
 
         return toolbar_view
@@ -283,7 +285,9 @@ if __name__ == "__main__":
             margin_end=4,
         )
 
-        listbox.append(TaskWidget(sample_task, lambda task: print(f"Would remove: {task.title.value}")))
+        listbox.append(
+            TaskWidget(sample_task, lambda task: print(f"Would remove: {task.title.value}"))
+        )
         return listbox
 
     @preview("TaskList")
