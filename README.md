@@ -22,16 +22,9 @@ A reactive UI framework for GTK4 applications in Python, inspired by modern reac
 pip install reactive-gtk
 ```
 
-## Two Approaches to GTK UI Development
-
-> [!NOTE]
-> The DSL Pattern (Approach 2) is the recommended and modern way to build ReactiveGTK applications.
-> The traditional approach is shown for comparison only.
+## Why ReactiveGTK?
 
 ### 1. Traditional GTK (Object-Oriented, Imperative)
-
-> [!CAUTION]
-> This approach is shown for historical context only. Use the DSL Pattern for new applications.
 
 Classic GTK widget development with manual state management:
 
@@ -153,43 +146,6 @@ app = App()
 app.run(None)
 ```
 
-For more complex applications with routing and multiple windows:
-
-```python
-from reactivegtk import Router
-
-def App():
-    router = Router()
-
-    @router.route("/")
-    def home():
-        return HelloWorld()
-
-    @router.route("/about")
-    def about():
-        return AboutView()
-
-    @router.route("/settings")
-    def settings():
-        return SettingsView()
-
-    return router
-
-app = Adw.Application(application_id="com.example.HelloWorld")
-app.connect("activate", lambda app: App().run(app))
-app.run(None)
-```
-
-## Why ReactiveGTK?
-
-GTK is a powerful toolkit for building native Linux applications, but its traditional object-oriented, imperative approach can lead to complex, hard-to-maintain code. ReactiveGTK brings modern reactive programming patterns to GTK development, making it easier to:
-
-- Build complex, stateful UIs without getting lost in callback hell
-- Keep UI and state in sync without manual event handling
-- Avoid common memory leaks and lifecycle issues
-- Write more maintainable, testable code
-- Create reusable, composable components
-
 ## Core Concepts
 
 ### 1. Reactive State
@@ -242,10 +198,13 @@ class MyComponent:
 
 ### 3. Widget Lifecycle
 
-Manage widget events, cleanup, and effects while preventing memory leaks:
+Widget lifecycle is the most important concept in ReactiveGTK.
 
 ```python
-from reactivegtk import WidgetLifecycle
+import asyncio
+from reactivegtk import WidgetLifecycle, start_event_loop, cleanup
+
+event_loop, thread = start_event_loop()
 
 box = Gtk.Box()
 lifecycle = WidgetLifecycle(box)
@@ -260,13 +219,24 @@ def on_click(*_):
 def on_count_change(new_value):
     print(f"Count changed to: {new_value}")
 
-# Cleanup when widget is destroyed
-@lifecycle.on_cleanup()
-def cleanup():
-    print("Widget destroyed")
+# Create side effects
+@lifecycle.watch(count, init=True)
+@lifecycle.effect(event_loop)
+async def on_count_change_effect(new_value):
+    asyncio.sleep(1)  # Simulate heavy computation
+    print(f"Count changed to: {new_value} (effect)")
+
+# Manual cleanup
+lifecycle.cleanup()  # removes all connections, cancels effects
+
+# This is equivalent to:
+cleanup(box)
 ```
 
-**Key Benefit**: `WidgetLifecycle` automatically manages signal connections using weak references, preventing the circular reference memory leaks common in traditional GTK development.
+Normally you don't need to call `cleanup()` manually, as the garbage collector will work correctly, unless you have circular references that prevent your widget from being garbage collected. The `WidgetLifecycle` will automatically clean up when the widget is destroyed, ensuring all connections are removed.
+
+**Key Benefit**: `WidgetLifecycle` manages signal connections using weak references. Using  `cleanup(widget)` on a widget with some connection setup via `lifecycle.watch()`, `lifecycle.subscribe()`, or `lifecycle.effect()` will be guaranteed to remove all connections and prevent memory leaks, even some of the connections may have circular references.
+
 
 ### 4. Declarative UI
 
@@ -462,10 +432,10 @@ def Counter():
 
 Check out the `demos` directory for more complete examples:
 
-- Hello World (`demos/hello.py`)
-- Counter (`demos/counter.py`)
-- To-Do List (`demos/todo.py`)
-- Multiple Auto-incrementing Counters (`demos/multi_counter.py`)
+- Hello World ([`demos/hello.py`](demos/hello.py))
+- Counter ([`demos/counter.py`](demos/counter.py))
+- To-Do List ([`demos/todo.py`](demos/todo.py))
+- Multiple Auto-incrementing Counters ([`demos/multi_counter.py`](demos/multi_counter.py))
 
 ## Contributing
 
