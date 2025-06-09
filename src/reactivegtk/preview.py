@@ -5,7 +5,8 @@ import gi
 
 from reactivegtk.lifecycle.core import WidgetLifecycle
 from reactivegtk.state import MutableState, State
-from reactivegtk.utils import into, start_event_loop
+from reactivegtk.utils import start_event_loop
+from reactivegtk.dsl import ui, apply, do
 
 gi.require_versions(
     {
@@ -156,16 +157,14 @@ class Preview:
                 return widget
 
             # Otherwise, create a window and add the widget
-            window = Gtk.Window(
-                title=title,
-                default_width=600,
-                default_height=400,
+            return ui(
+                window := Gtk.Window(
+                    title=title,
+                    default_width=600,
+                    default_height=400,
+                ),
+                window.set_child(widget),
             )
-
-            # Add the widget to the window
-            window.set_child(widget)
-
-            return window
 
         # Preserve the original function's name for registration
         window_factory.__name__ = widget_factory.__name__
@@ -204,47 +203,39 @@ class Preview:
 
     def _create_window_launch_button(self, widget_name: str) -> Gtk.Widget:
         """Create a button that launches a window when clicked."""
-        button_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=12,
-            halign=Gtk.Align.CENTER,
-            valign=Gtk.Align.CENTER,
-        )
-        lifecycle = WidgetLifecycle(button_box)
-
-        @into(button_box.append)
-        def _():
-            launch_button = Gtk.Button(
-                label=f"Launch {widget_name}",
-                css_classes=["suggested-action", "pill"],
+        return ui(
+            button_box := Gtk.Box(
+                orientation=Gtk.Orientation.VERTICAL,
+                spacing=12,
                 halign=Gtk.Align.CENTER,
-            )
-
-            @lifecycle.subscribe(launch_button, "clicked")
-            def _(*_):
-                # Always create a fresh window instance
-                widget_factory = self.widgets[widget_name]
-                fresh_window = widget_factory(self.event_loop)
-
-                # Ensure it's actually a window
-                if not isinstance(fresh_window, Gtk.Window):
-                    return
-
-                # Present the window - GTK will handle lifecycle
-                fresh_window.present()
-
-            return launch_button
-
-        @into(button_box.append)
-        def _():
-            return Gtk.Label(
-                label="This is a window widget. Click the button above to launch it.",
-                css_classes=["dim-label"],
-                wrap=True,
-                justify=Gtk.Justification.CENTER,
-            )
-
-        return button_box
+                valign=Gtk.Align.CENTER,
+            ),
+            lifecycle := WidgetLifecycle(button_box),
+            apply(button_box.append).foreach(
+                ui(
+                    launch_button := Gtk.Button(
+                        label=f"Launch {widget_name}",
+                        css_classes=["suggested-action", "pill"],
+                        halign=Gtk.Align.CENTER,
+                    ),
+                    lifecycle.subscribe(launch_button, "clicked")(
+                        lambda *_: do(
+                            widget_factory := self.widgets[widget_name],
+                            fresh_window := widget_factory(self.event_loop),
+                            fresh_window.present()
+                            if isinstance(fresh_window, Gtk.Window)
+                            else None,
+                        )
+                    ),
+                ),
+                Gtk.Label(
+                    label="This is a window widget. Click the button above to launch it.",
+                    css_classes=["dim-label"],
+                    wrap=True,
+                    justify=Gtk.Justification.CENTER,
+                ),
+            ),
+        )
 
     def run(self, argv: list[str] | None = None):
         """Run the application."""
@@ -259,185 +250,190 @@ def HeaderBar(
     widgets: dict[str, Callable],
 ) -> Adw.HeaderBar:
     """Create the header bar with sidebar toggle and reload button."""
-    header_bar = Adw.HeaderBar()
-    lifecycle = WidgetLifecycle(header_bar)
-
-    @into(header_bar.pack_start)
-    def _():
-        # Sidebar toggle button
-        toggle_button = Gtk.ToggleButton(icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar")
-
-        # Bind toggle button to sidebar visibility
-        @lifecycle.watch(show_sidebar, init=True)
-        def _(show: bool):
-            toggle_button.set_active(show)
-
-        @lifecycle.subscribe(toggle_button, "toggled")
-        def _(*_):
-            show_sidebar.set(toggle_button.get_active())
-
-        return toggle_button
-
-    @into(header_bar.pack_end)
-    def _():
-        # Reload button
-        reload_button = Gtk.Button(
-            icon_name="view-refresh-symbolic",
-            tooltip_text="Reload Content",
-            sensitive=bool(widgets),
-        )
-
-        @lifecycle.subscribe(reload_button, "clicked")
-        def _(*_):
-            reload_callback()
-
-        @lifecycle.watch(selected_widget, init=True)
-        def _(_):
-            reload_button.set_sensitive(bool(selected_widget.value and selected_widget.value in widgets))
-
-        return reload_button
-
-    return header_bar
+    return ui(
+        header_bar := Adw.HeaderBar(),
+        lifecycle := WidgetLifecycle(header_bar),
+        header_bar.pack_start(
+            ui(
+                toggle_button := Gtk.ToggleButton(
+                    icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar"
+                ),
+                lifecycle.watch(show_sidebar, init=True)(
+                    lambda show: toggle_button.set_active(show)
+                ),
+                lifecycle.subscribe(toggle_button, "toggled")(
+                    lambda *_: show_sidebar.set(toggle_button.get_active())
+                ),
+            ),
+        ),
+        header_bar.pack_end(
+            ui(
+                reload_button := Gtk.Button(
+                    icon_name="view-refresh-symbolic",
+                    tooltip_text="Reload Content",
+                    sensitive=bool(widgets),
+                ),
+                lifecycle.subscribe(reload_button, "clicked")(lambda *_: reload_callback()),
+                lifecycle.watch(selected_widget, init=True)(
+                    lambda _: reload_button.set_sensitive(
+                        bool(selected_widget.value and selected_widget.value in widgets)
+                    )
+                ),
+            ),
+        ),
+    )
 
 
 def Sidebar(selected_widget: MutableState[str], widgets: dict[str, Callable]) -> Gtk.Widget:
     """Create the sidebar with navigation list."""
-    scrolled = Gtk.ScrolledWindow(
-        hscrollbar_policy=Gtk.PolicyType.NEVER,
-        vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
-    )
-    lifecycle = WidgetLifecycle(scrolled)
+    widget_rows = {}
 
-    @into(scrolled.set_child)
-    def _():
-        # Create list box for navigation
-        listbox = Gtk.ListBox(
-            css_classes=["navigation-sidebar"],
-            selection_mode=Gtk.SelectionMode.SINGLE,
-        )
-
-        # Add rows for each widget
-        widget_rows = {}
-        for widget_name in widgets.keys():
-
-            @into(listbox.append)
-            def _(name=widget_name):
-                row = Adw.ActionRow(title=name, activatable=True)
-                widget_rows[name] = row
-                return row
-
-        # Set initial selection and sync with state
-        @lifecycle.watch(selected_widget, init=True)
-        def _(_):
-            # Find and select the row that matches current state
-            target_row = None
-            if selected_widget.value in widget_rows:
-                target_row = widget_rows[selected_widget.value]
-            elif widgets:
-                # Fallback to first widget if current selection is invalid
-                first_name = list(widgets.keys())[0]
-                target_row = widget_rows[first_name]
-                selected_widget.set(first_name)
-
-            if target_row:
-                listbox.select_row(target_row)
-
-        # Handle row selection
-        @lifecycle.subscribe(listbox, "row-selected")
-        def _(*_):
-            selected_row = listbox.get_selected_row()
-            if selected_row:
-                for name, row in widget_rows.items():
-                    if row == selected_row:
-                        selected_widget.set(name)
-                        break
-
-        return listbox
-
-    return scrolled
-
-
-def PreviewArea(selected_widget: State[str], create_widget_func: Callable[[str], Gtk.Widget]) -> Gtk.Widget:
-    """Create the preview area for displaying widgets."""
-    clamp = Adw.Clamp(
-        maximum_size=800,
-        tightening_threshold=600,
-        halign=Gtk.Align.CENTER,
-        valign=Gtk.Align.CENTER,
-    )
-    lifecycle = WidgetLifecycle(clamp)
-
-    @into(clamp.set_child)
-    def _():
-        # Container that will hold the preview widget
-        preview_box = Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=12,
-            margin_top=24,
-            margin_bottom=24,
-            margin_start=24,
-            margin_end=24,
-        )
-
-        # Update preview when selected widget changes
-        @lifecycle.watch(selected_widget, init=True)
-        def _(_):
-            # Clear existing children
-            child = preview_box.get_first_child()
-            while child:
-                next_child = child.get_next_sibling()
-                preview_box.remove(child)
-                child = next_child
-
-            # Create and add the preview widget
-            if selected_widget.value:
-                try:
-                    preview_widget = create_widget_func(selected_widget.value)
-
-                    if preview_widget:
-                        # If widget has a parent, remove it first (for cached widgets)
-                        current_parent = preview_widget.get_parent()
-                        if current_parent:
-                            preview_widget.unparent()
-
-                        preview_box.append(preview_widget)
-                    else:
-                        raise Exception("Failed to create widget")
-
-                except Exception as e:
-                    # Show error if widget creation fails
-                    error_box = Gtk.Box(
-                        orientation=Gtk.Orientation.VERTICAL,
-                        spacing=8,
-                        halign=Gtk.Align.CENTER,
-                        valign=Gtk.Align.CENTER,
+    return ui(
+        scrolled := Gtk.ScrolledWindow(
+            hscrollbar_policy=Gtk.PolicyType.NEVER,
+            vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
+        ),
+        lifecycle := WidgetLifecycle(scrolled),
+        scrolled.set_child(
+            ui(
+                listbox := Gtk.ListBox(
+                    css_classes=["navigation-sidebar"],
+                    selection_mode=Gtk.SelectionMode.SINGLE,
+                ),
+                # Add rows for each widget
+                apply(listbox.append).foreach(
+                    *[
+                        widget_rows.setdefault(
+                            widget_name, _ := Adw.ActionRow(title=widget_name, activatable=True)
+                        )
+                        for widget_name in widgets.keys()
+                    ]
+                ),
+                # Set initial selection and sync with state
+                lifecycle.watch(selected_widget, init=True)(
+                    lambda _: do(
+                        target_row := (
+                            widget_rows.get(selected_widget.value)
+                            or (
+                                widget_rows[first_name]
+                                if (first_name := list(widgets.keys())[0] if widgets else None)
+                                and selected_widget.set(first_name) is None
+                                else None
+                            )
+                        ),
+                        listbox.select_row(target_row) if target_row else None,
                     )
+                ),
+                # Handle row selection
+                lifecycle.subscribe(listbox, "row-selected")(
+                    lambda *_: do(
+                        selected_row := listbox.get_selected_row(),
+                        selected_widget.set(name)
+                        if selected_row
+                        and (
+                            name := next(
+                                (name for name, row in widget_rows.items() if row == selected_row),
+                                None,
+                            )
+                        )
+                        else None,
+                    )
+                ),
+            ),
+        ),
+    )
 
-                    error_icon = Gtk.Label(
+
+def PreviewArea(
+    selected_widget: State[str], create_widget_func: Callable[[str], Gtk.Widget]
+) -> Gtk.Widget:
+    """Create the preview area for displaying widgets."""
+    return ui(
+        clamp := Adw.Clamp(
+            maximum_size=800,
+            tightening_threshold=600,
+            halign=Gtk.Align.CENTER,
+            valign=Gtk.Align.CENTER,
+        ),
+        lifecycle := WidgetLifecycle(clamp),
+        clamp.set_child(
+            ui(
+                preview_box := Gtk.Box(
+                    orientation=Gtk.Orientation.VERTICAL,
+                    spacing=12,
+                    margin_top=24,
+                    margin_bottom=24,
+                    margin_start=24,
+                    margin_end=24,
+                ),
+                # Update preview when selected widget changes
+                lifecycle.watch(selected_widget, init=True)(
+                    lambda _: _update_preview_content(
+                        preview_box, selected_widget.value, create_widget_func
+                    )
+                ),
+            ),
+        ),
+    )
+
+
+def _get_all_children(container):
+    """Helper to get all children from a container"""
+    children = []
+    child = container.get_first_child()
+    while child:
+        children.append(child)
+        child = child.get_next_sibling()
+    return children
+
+
+def _update_preview_content(preview_box, widget_name, create_widget_func):
+    """Helper to update preview content"""
+    # Clear existing children safely
+    children = _get_all_children(preview_box)
+    for child in children:
+        # Only remove if it's actually a child of this container
+        if child.get_parent() == preview_box:
+            preview_box.remove(child)
+
+    if widget_name:
+        try:
+            preview_widget = create_widget_func(widget_name)
+            if preview_widget:
+                # If widget has a parent, remove it first (for cached widgets)
+                current_parent = preview_widget.get_parent()
+                if current_parent:
+                    preview_widget.unparent()
+                preview_box.append(preview_widget)
+            else:
+                raise Exception("Failed to create widget")
+        except Exception as e:
+            # Show error if widget creation fails
+            error_box = ui(
+                error_container := Gtk.Box(
+                    orientation=Gtk.Orientation.VERTICAL,
+                    spacing=8,
+                    halign=Gtk.Align.CENTER,
+                    valign=Gtk.Align.CENTER,
+                ),
+                apply(error_container.append).foreach(
+                    Gtk.Label(
                         label="⚠️",
                         css_classes=["title-1"],
-                    )
-
-                    error_title = Gtk.Label(
+                    ),
+                    Gtk.Label(
                         label="Widget Creation Error",
                         css_classes=["title-3"],
-                    )
-
-                    error_message = Gtk.Label(
+                    ),
+                    Gtk.Label(
                         label=str(e),
                         css_classes=["dim-label"],
                         wrap=True,
                         justify=Gtk.Justification.CENTER,
-                    )
-
-                    error_box.append(error_icon)
-                    error_box.append(error_title)
-                    error_box.append(error_message)
-                    preview_box.append(error_box)
-
-        return preview_box
-
-    return clamp
+                    ),
+                ),
+            )
+            preview_box.append(error_box)
 
 
 def MainContent(
@@ -447,75 +443,81 @@ def MainContent(
     create_widget_func: Callable[[str], Gtk.Widget],
 ) -> Gtk.Widget:
     """Create the main content area with sidebar and preview."""
-    split_view = Adw.OverlaySplitView(min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25)
-    lifecycle = WidgetLifecycle(split_view)
-
-    # Bind sidebar visibility to state
-    @lifecycle.watch(show_sidebar, init=True)
-    def _(_):
-        split_view.set_show_sidebar(show_sidebar.value)
-
-    # Set sidebar and content
-    split_view.set_sidebar(Sidebar(selected_widget, widgets))
-    split_view.set_content(PreviewArea(selected_widget, create_widget_func))
-
-    return split_view
+    return ui(
+        split_view := Adw.OverlaySplitView(
+            min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25
+        ),
+        lifecycle := WidgetLifecycle(split_view),
+        # Bind sidebar visibility to state
+        lifecycle.watch(show_sidebar, init=True)(
+            lambda _: split_view.set_show_sidebar(show_sidebar.value)
+        ),
+        # Set sidebar and content
+        split_view.set_sidebar(Sidebar(selected_widget, widgets)),
+        split_view.set_content(PreviewArea(selected_widget, create_widget_func)),
+    )
 
 
 def Window(app: Adw.Application, preview: Preview) -> Adw.ApplicationWindow:
     """Create the main application window."""
-    window = Adw.ApplicationWindow(application=app, default_width=1000, default_height=700, title="Preview Widgets")
-
     # State to track selected widget
     selected_widget = MutableState[str](list(preview.widgets.keys())[0] if preview.widgets else "")
-
     # State to control sidebar visibility
     show_sidebar = MutableState[bool](True)
 
-    @into(window.set_content)
-    def _():
-        # Create ToolbarView as the main container
-        toolbar_view = Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.RAISED)
-
-        def reload_content():
-            # Clear widget cache to force recreation
-            preview._widget_cache.clear()
-            # Remember current selection
-            current_selection = selected_widget.value
-            # Clear current content
-            toolbar_view.set_content(None)
-            # Recreate content
-            toolbar_view.set_content(
-                MainContent(
-                    selected_widget,
-                    show_sidebar,
-                    preview.widgets,
-                    preview._create_widget,
-                )
+    def reload_content():
+        # Clear widget cache to force recreation
+        preview._widget_cache.clear()
+        # Remember current selection
+        current_selection = selected_widget.value
+        # Clear current content
+        toolbar_view.set_content(None)
+        # Recreate content
+        toolbar_view.set_content(
+            MainContent(
+                selected_widget,
+                show_sidebar,
+                preview.widgets,
+                preview._create_widget,
             )
-            # Restore selection
-            if current_selection and current_selection in preview.widgets:
-                selected_widget.set(current_selection)
+        )
+        # Restore selection
+        if current_selection and current_selection in preview.widgets:
+            selected_widget.set(current_selection)
 
-        # Add header bar
-        toolbar_view.add_top_bar(HeaderBar(selected_widget, show_sidebar, reload_content, preview.widgets))
-
-        # Set initial content
-        toolbar_view.set_content(MainContent(selected_widget, show_sidebar, preview.widgets, preview._create_widget))
-
-        return toolbar_view
-
-    return window
+    return ui(
+        window := Adw.ApplicationWindow(
+            application=app, default_width=1000, default_height=700, title="Preview Widgets"
+        ),
+        window.set_content(
+            ui(
+                toolbar_view := Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.RAISED),
+                # Add header bar
+                toolbar_view.add_top_bar(
+                    HeaderBar(selected_widget, show_sidebar, reload_content, preview.widgets)
+                ),
+                # Set initial content
+                toolbar_view.set_content(
+                    MainContent(
+                        selected_widget, show_sidebar, preview.widgets, preview._create_widget
+                    )
+                ),
+            ),
+        ),
+    )
 
 
 def App(preview: Preview) -> Adw.Application:
     """Create the preview application."""
-    app = Adw.Application(application_id="com.example.PreviewApp")
-
-    @lambda f: app.connect("activate", f)
-    def _(*_):
-        window = Window(app, preview)
-        window.set_application(app)
-        window.present()
-
-    return app
+    return do(
+        app := Adw.Application(application_id="com.example.PreviewApp"),
+        app.connect(
+            "activate",
+            lambda *_: do(
+                window := Window(app, preview),
+                window.set_application(app),
+                window.present(),
+            ),
+        ),
+        ret=app,
+    )
