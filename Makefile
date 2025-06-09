@@ -31,12 +31,12 @@ install: sync
 
 # Format code with ruff (includes import sorting)
 format:
-	$(UV) run ruff format $(SRC_DIR) $(DEMO_DIR)
-	$(UV) run ruff check --select I --fix $(PYTHON_FILES)
+	$(UV) run ruff format --ignore-noqa $(SRC_DIR) $(DEMO_DIR)
+	$(UV) run ruff check --ignore-noqa --select I --fix $(PYTHON_FILES)
 
 # Lint code with ruff
 lint:
-	$(UV) run ruff check $(SRC_DIR) $(DEMO_DIR)
+	$(UV) run ruff check --ignore-noqa $(SRC_DIR) $(DEMO_DIR)
 
 # Type checking with pyright
 typecheck:

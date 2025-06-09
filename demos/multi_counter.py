@@ -7,7 +7,7 @@ import gi
 
 from reactivegtk import MutableState, State, WidgetLifecycle, start_event_loop
 from reactivegtk.widgets import Conditional, ReactiveSequence
-from reactivegtk.dsl import ui, do, apply
+from reactivegtk.dsl import build, do, apply
 
 gi.require_versions(
     {
@@ -29,103 +29,114 @@ def CounterWidget(
     event_loop: asyncio.AbstractEventLoop,
     on_remove: Callable[[CounterModel], None],
 ) -> Gtk.Widget:
-    vbox = Gtk.Box(
-        orientation=Gtk.Orientation.VERTICAL,
-        spacing=6,
-        valign=Gtk.Align.CENTER,
-        halign=Gtk.Align.CENTER,
-    )
-    lifecycle = WidgetLifecycle(vbox)
-
-    @lifecycle.watch(model.auto_increment, init=True)
-    @lifecycle.effect(event_loop)
-    async def auto_increment():
-        """Auto-increment effect that runs while auto is enabled"""
-        while model.auto_increment.value:
-            await asyncio.sleep(1)
-            model.count.update(lambda x: x + 1)
-
-    return ui(
-        vbox,
-        # Lifecycle logging
-        lifecycle.subscribe(vbox, "realize")(lambda *_: print("Counter widget realized")),
-        lifecycle.subscribe(vbox, "unrealize")(lambda *_: print("Counter widget unrealized")),
-        lifecycle.on_cleanup(lambda: print("Counter widget destroyed")),
-        # Counter controls and buttons
-        apply(vbox.append).foreach(
-            # Counter controls
-            ui(
-                hbox := Gtk.Box(
-                    orientation=Gtk.Orientation.HORIZONTAL,
-                    spacing=12,
-                    halign=Gtk.Align.CENTER,
-                    valign=Gtk.Align.CENTER,
-                ),
-                apply(hbox.append).foreach(
-                    # Decrement button
-                    ui(
-                        dec_button := Gtk.Button(
-                            icon_name="list-remove-symbolic",
-                            css_classes=["circular"],
-                            valign=Gtk.Align.CENTER,
-                        ),
-                        lifecycle.subscribe(dec_button, "clicked")(
-                            lambda *_: model.count.update(lambda x: x - 1)
-                        ),
+    return build(
+        Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=6,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER,
+        ),
+        lambda vbox: do(
+            lifecycle := WidgetLifecycle(vbox),
+            # Auto-increment effect
+            lifecycle.watch(model.auto_increment, init=True)(
+                lifecycle.effect(event_loop)(
+                    lambda: auto_increment_effect(model)
+                )
+            ),
+            # Lifecycle logging
+            lifecycle.subscribe(vbox, "realize")(lambda *_: print("Counter widget realized")),
+            lifecycle.subscribe(vbox, "unrealize")(lambda *_: print("Counter widget unrealized")),
+            lifecycle.on_cleanup(lambda: print("Counter widget destroyed")),
+            # Counter controls and buttons
+            apply(vbox.append).foreach(
+                # Counter controls
+                build(
+                    Gtk.Box(
+                        orientation=Gtk.Orientation.HORIZONTAL,
+                        spacing=12,
+                        halign=Gtk.Align.CENTER,
+                        valign=Gtk.Align.CENTER,
                     ),
-                    # Count label
-                    ui(
-                        label := Gtk.Label(
-                            css_classes=["title-2"],
-                            margin_start=12,
-                            margin_end=12,
-                            valign=Gtk.Align.CENTER,
+                    lambda hbox: apply(hbox.append).foreach(
+                        # Decrement button
+                        build(
+                            Gtk.Button(
+                                icon_name="list-remove-symbolic",
+                                css_classes=["circular"],
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda dec_button: lifecycle.subscribe(dec_button, "clicked")(
+                                lambda *_: model.count.update(lambda x: x - 1)
+                            ),
                         ),
-                        lifecycle.watch(model.count, init=True)(
-                            lambda _: label.set_label(str(model.count.value))
+                        # Count label
+                        build(
+                            Gtk.Label(
+                                css_classes=["title-2"],
+                                margin_start=12,
+                                margin_end=12,
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda label: lifecycle.watch(model.count, init=True)(
+                                lambda _: label.set_label(str(model.count.value))
+                            ),
                         ),
-                    ),
-                    # Increment button
-                    ui(
-                        inc_button := Gtk.Button(
-                            icon_name="list-add-symbolic",
-                            css_classes=["circular"],
-                            valign=Gtk.Align.CENTER,
-                        ),
-                        lifecycle.subscribe(inc_button, "clicked")(
-                            lambda *_: model.count.update(lambda x: x + 1)
+                        # Increment button
+                        build(
+                            Gtk.Button(
+                                icon_name="list-add-symbolic",
+                                css_classes=["circular"],
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda inc_button: lifecycle.subscribe(inc_button, "clicked")(
+                                lambda *_: model.count.update(lambda x: x + 1)
+                            ),
                         ),
                     ),
                 ),
-            ),
-            # Reset button
-            ui(
-                reset_button := Gtk.Button(label="Reset", css_classes=["destructive-action"]),
-                lifecycle.subscribe(reset_button, "clicked")(lambda *_: model.count.set(0)),
-            ),
-            # Auto-increment toggle
-            ui(
-                auto_button := Gtk.Button(),
-                lifecycle.subscribe(auto_button, "clicked")(
-                    lambda *_: model.auto_increment.update(lambda x: not x)
+                # Reset button
+                build(
+                    Gtk.Button(label="Reset", css_classes=["destructive-action"]),
+                    lambda reset_button: lifecycle.subscribe(reset_button, "clicked")(
+                        lambda *_: model.count.set(0)
+                    ),
                 ),
-                lifecycle.watch(model.auto_increment, init=True)(
-                    lambda auto: auto_button.set_label(
-                        "Stop Auto-increment" if auto else "Start Auto-increment"
-                    )
+                # Auto-increment toggle
+                build(
+                    Gtk.Button(),
+                    lambda auto_button: do(
+                        lifecycle.subscribe(auto_button, "clicked")(
+                            lambda *_: model.auto_increment.update(lambda x: not x)
+                        ),
+                        lifecycle.watch(model.auto_increment, init=True)(
+                            lambda auto: auto_button.set_label(
+                                "Stop Auto-increment" if auto else "Start Auto-increment"
+                            )
+                        ),
+                    ),
                 ),
-            ),
-            # Remove button
-            ui(
-                remove_button := Gtk.Button(
-                    label="Remove Counter",
-                    css_classes=["destructive-action"],
-                    halign=Gtk.Align.CENTER,
+                # Remove button
+                build(
+                    Gtk.Button(
+                        label="Remove Counter",
+                        css_classes=["destructive-action"],
+                        halign=Gtk.Align.CENTER,
+                    ),
+                    lambda remove_button: lifecycle.subscribe(remove_button, "clicked")(
+                        lambda *_: on_remove(model)
+                    ),
                 ),
-                lifecycle.subscribe(remove_button, "clicked")(lambda *_: on_remove(model)),
             ),
         ),
     )
+
+
+async def auto_increment_effect(model: CounterModel):
+    """Auto-increment effect that runs while auto is enabled"""
+    while model.auto_increment.value:
+        await asyncio.sleep(1)
+        model.count.update(lambda x: x + 1)
 
 
 def CounterFlowBoxChild(
@@ -133,11 +144,11 @@ def CounterFlowBoxChild(
     event_loop: asyncio.AbstractEventLoop,
     on_remove: Callable[[CounterModel], None],
 ) -> Gtk.FlowBoxChild:
-    return ui(
-        child := Gtk.FlowBoxChild(),
-        child.set_child(
-            ui(
-                container := Gtk.Box(
+    return build(
+        Gtk.FlowBoxChild(),
+        lambda child: child.set_child(
+            build(
+                Gtk.Box(
                     orientation=Gtk.Orientation.VERTICAL,
                     spacing=6,
                     margin_top=12,
@@ -145,7 +156,7 @@ def CounterFlowBoxChild(
                     margin_start=12,
                     margin_end=12,
                 ),
-                container.append(CounterWidget(model, event_loop, on_remove)),
+                lambda container: container.append(CounterWidget(model, event_loop, on_remove)),
             ),
         ),
     )
@@ -199,38 +210,48 @@ def CounterWindow(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindo
         except ValueError:
             pass
 
-    return ui(
-        window := Adw.ApplicationWindow(title="Counter App"),
-        window.set_default_size(800, 600),
-        window.set_content(
-            ui(
-                toolbar_view := Adw.ToolbarView(),
-                # Header bar with add button
-                toolbar_view.add_top_bar(
-                    ui(
-                        header_bar := Adw.HeaderBar(),
-                        header_bar.pack_start(
-                            ui(
-                                add_button := Gtk.Button(
-                                    label="Add Counter", css_classes=["suggested-action"]
-                                ),
-                                lifecycle := WidgetLifecycle(add_button),
-                                lifecycle.subscribe(add_button, "clicked")(
-                                    lambda *_: add_counter()
+    return build(
+        Adw.ApplicationWindow(title="Counter App"),
+        lambda window: do(
+            window.set_default_size(800, 600),
+            window.set_content(
+                build(
+                    Adw.ToolbarView(),
+                    lambda toolbar_view: do(
+                        # Header bar with add button
+                        toolbar_view.add_top_bar(
+                            build(
+                                Adw.HeaderBar(),
+                                lambda header_bar: header_bar.pack_start(
+                                    build(
+                                        Gtk.Button(
+                                            label="Add Counter", css_classes=["suggested-action"]
+                                        ),
+                                        lambda add_button: do(
+                                            lifecycle := WidgetLifecycle(add_button),
+                                            lifecycle.subscribe(add_button, "clicked")(
+                                                lambda *_: add_counter()
+                                            ),
+                                        ),
+                                    ),
                                 ),
                             ),
                         ),
-                    ),
-                ),
-                # Main content area
-                toolbar_view.set_content(
-                    ui(
-                        scrolled := Gtk.ScrolledWindow(hexpand=True, vexpand=True, has_frame=False),
-                        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC),
-                        scrolled.set_child(
-                            ui(
-                                clamp := Adw.Clamp(maximum_size=900, tightening_threshold=600),
-                                clamp.set_child(CounterList(models, event_loop, remove_counter)),
+                        # Main content area
+                        toolbar_view.set_content(
+                            build(
+                                Gtk.ScrolledWindow(hexpand=True, vexpand=True, has_frame=False),
+                                lambda scrolled: do(
+                                    scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC),
+                                    scrolled.set_child(
+                                        build(
+                                            Adw.Clamp(maximum_size=900, tightening_threshold=600),
+                                            lambda clamp: clamp.set_child(
+                                                CounterList(models, event_loop, remove_counter)
+                                            ),
+                                        ),
+                                    ),
+                                ),
                             ),
                         ),
                     ),
