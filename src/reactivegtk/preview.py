@@ -5,7 +5,7 @@ from collections.abc import Sequence
 import gi
 
 from reactivegtk.dsl import apply, do, ui
-from reactivegtk.lifecycle.core import WidgetLifecycle
+from reactivegtk.lifecycle import WidgetLifecycle
 from reactivegtk.state import MutableState, State
 from reactivegtk.utils import start_event_loop
 from reactivegtk.widgets import Conditional
