@@ -16,7 +16,7 @@ A reactive UI framework for GTK4 applications in Python, inspired by modern reac
 
 ```bash
 # with pip
-pip install git+https://https://github.com/Microwave-WYB/reactivegtk.git
+pip install git+https://github.com/Microwave-WYB/reactivegtk.git
 ```
 
 **Requirements:**
@@ -59,7 +59,7 @@ def HelloWorld():
         name.twoway_bind(entry, "text")
 
         @lifecycle.subscribe(entry, "activate")
-        def _(_):
+        def _(*_):
             print(f"Entry activated with text: {name.value}")
 
         return entry
@@ -157,7 +157,7 @@ lifecycle = WidgetLifecycle(box)
 
 # Subscribe to widget signals
 @lifecycle.subscribe(button, "clicked")
-def on_click(_):
+def on_click(*_):
     print("Button clicked!")
 
 # Watch state changes
@@ -264,7 +264,7 @@ def TodoView(app: TodoApp) -> Gtk.Widget:
         app.new_task_text.twoway_bind(entry, "text")
 
         @lifecycle.subscribe(entry, "activate")
-        def _(_):
+        def _(*_):
             app.add_task(app.new_task_text.value)
 
         return entry
@@ -295,7 +295,7 @@ def TodoView(app: TodoApp) -> Gtk.Widget:
             task_lifecycle = WidgetLifecycle(row)
 
             @task_lifecycle.subscribe(remove_btn, "clicked")
-            def _(_):
+            def _(*_):
                 app.remove_task(task)
 
             task_box.append(remove_btn)
@@ -354,14 +354,65 @@ preview.run()  # Shows preview window with component selector
 - **`bind_sequence(container, state, key_fn?)`**: Bind collections to UI
 - **`start_event_loop()`**: Start async event loop for effects
 
+### DSL (Domain Specific Language)
+
+ReactiveGTK includes a DSL for more declarative UI construction:
+
+```python
+from reactivegtk.dsl import ui, apply
+
+def Counter() -> Gtk.Widget:
+    count = MutableState(0)
+
+    return ui(
+        box := Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=6,
+            valign=Gtk.Align.CENTER,
+            halign=Gtk.Align.CENTER,
+        ),
+        lifecycle := WidgetLifecycle(box),
+        apply(box.append).foreach(
+            ui(
+                label := Gtk.Label(css_classes=["title-1"]),
+                count.map(str).bind(label, "label"),
+            ),
+            ui(
+                hbox := Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12),
+                apply(hbox.append).foreach(
+                    ui(
+                        button := Gtk.Button(icon_name="list-remove-symbolic"),
+                        lifecycle.subscribe(button, "clicked")(
+                            lambda *_: count.update(lambda x: x - 1)
+                        ),
+                    ),
+                    ui(
+                        button := Gtk.Button(icon_name="list-add-symbolic"),
+                        lifecycle.subscribe(button, "clicked")(
+                            lambda *_: count.update(lambda x: x + 1)
+                        ),
+                    ),
+                ),
+            ),
+        ),
+    )
+```
+
+**DSL Functions:**
+- **`ui(target, *actions)`**: Execute actions and return the target widget
+- **`apply(fn).foreach(*items)`**: Apply a function to multiple items
+- **`do(*actions, ret=value)`**: Execute actions and return a value
+
 ## Examples
 
 Check out the `demos/` directory for complete examples:
 
 - **[`counter.py`](demos/counter.py)**: Simple counter with increment/decrement
-- **[`calc.py`](demos/calc.py)**: Calculator with complex state management
-- **[`todo.py`](demos/todo.py)**: Todo app with dynamic lists
+- **[`counter_dsl.py`](demos/counter_dsl.py)**: Counter using DSL syntax
+- **[`todo.py`](demos/todo.py)**: Todo app with dynamic lists  
+- **[`todo_dsl.py`](demos/todo_dsl.py)**: Todo app using DSL syntax
 - **[`multi_counter.py`](demos/multi_counter.py)**: Multiple counters with async auto-increment
+- **[`hello.py`](demos/hello.py)**: Simple hello world example
 
 ## Contributing
 
