@@ -1,7 +1,13 @@
 from typing import Any, Callable, Generic, TypeVar
 
+import gi
 from typing_extensions import TypeVarTuple, Unpack
 
+gi.require_version("Gtk", "4.0")
+
+from gi.repository import Gtk  # type: ignore # noqa: E402
+
+WidgetT = TypeVar("WidgetT", bound="Gtk.Widget", covariant=True)
 T = TypeVar("T")
 Ts = TypeVarTuple("Ts")
 
@@ -10,7 +16,7 @@ def do(*actions: Any, ret: T = None) -> T:
     return ret
 
 
-def ui(target: T, *actions: Any) -> T:
+def ui(target: WidgetT, *actions: Any) -> WidgetT:
     return do(*actions, ret=target)
 
 

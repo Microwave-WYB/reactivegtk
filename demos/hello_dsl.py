@@ -40,7 +40,7 @@ def HelloWorld():
 
 # Create and run the app
 def App():
-    return ui(
+    return do(
         app := Adw.Application(application_id="com.example.HelloWorld"),
         app.connect(
             "activate",
@@ -50,6 +50,7 @@ def App():
                 window.present(),
             ),
         ),
+        ret=app,
     )
 
 

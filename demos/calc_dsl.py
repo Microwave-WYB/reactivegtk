@@ -312,12 +312,13 @@ def CalculatorWindow() -> Adw.Window:
         ),
         lifecycle := WidgetLifecycle(window),
         window.add_controller(
-            ui(
+            do(
                 key_controller := Gtk.EventControllerKey(
                     name="key-controller",
                     propagation_phase=Gtk.PropagationPhase.CAPTURE,
                 ),
                 lifecycle.subscribe(key_controller, "key-pressed")(handle_key_press),
+                ret=key_controller,
             )
         ),
         window.set_content(
