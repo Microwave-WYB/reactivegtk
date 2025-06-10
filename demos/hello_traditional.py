@@ -32,7 +32,7 @@ class HelloWorldWidget(Gtk.Box):
         self._update_label()
 
     def _update_label(self) -> None:
-        text = f"Hello, {self.name}!" if self.name else "Hello, ...!"
+        text = f"Hello, {self.name or '...'}!"
         self.label.set_text(text)
 
 

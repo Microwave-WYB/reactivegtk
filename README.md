@@ -67,7 +67,7 @@ class HelloWorldWidget(Gtk.Box):
         self._update_label()
 
     def _update_label(self) -> None:
-        text = f"Hello, {self.name}!" if self.name else "Hello, ...!"
+        text = f"Hello, {self.name or '...'}!"
         self.label.set_text(text)
 
 
@@ -131,7 +131,7 @@ class HelloWorldWidget(Gtk.Box):
 
         # Set up reactive bindings
         self.name.twoway_bind(self.entry, "text")
-        self.name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(self.label, "label")
+        self.name.map(lambda x: f"Hello, {x or '...'}!").bind(self.label, "label")
 
     def _on_entry_activate(self, entry: Gtk.Entry) -> None:
         print(f"Entry activated with text: {self.name.value}")
@@ -273,7 +273,7 @@ Bind state directly to widget properties with automatic updates:
 # One-way binding: state → widget (works with both State and MutableState)
 name = MutableState("World")
 label = Gtk.Label()
-name.map(lambda x: f"Hello, {x}!").bind(label, "label")
+name.map(lambda x: f"Hello, {x or '...'}!").bind(label, "label")
 
 # Two-way binding: state ↔ widget (only works with MutableState)
 text_state = MutableState("")

@@ -29,7 +29,7 @@ class HelloWorldWidget(Gtk.Box):
 
         # Set up reactive bindings
         self.name.twoway_bind(self.entry, "text")
-        self.name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(self.label, "label")
+        self.name.map(lambda x: f"Hello, {x or '...'}!").bind(self.label, "label")
 
     def _on_entry_activate(self, entry: Gtk.Entry) -> None:
         print(f"Entry activated with text: {self.name.value}")
