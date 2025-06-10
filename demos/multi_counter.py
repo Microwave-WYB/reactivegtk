@@ -62,17 +62,13 @@ def CounterWidget(
                 # Reset button
                 build(
                     Gtk.Button(label="Reset", css_classes=["destructive-action"]),
-                    lambda reset_button: reset_button.connect(
-                        "clicked", lambda *_: model.count.set(0)
-                    ),
+                    lambda reset_button: reset_button.connect("clicked", lambda *_: model.count.set(0)),
                 ),
                 # Auto-increment toggle
                 build(
                     Gtk.Button(),
                     lambda auto_button: do(
-                        auto_button.connect(
-                            "clicked", lambda *_: model.auto_increment.update(lambda x: not x)
-                        ),
+                        auto_button.connect("clicked", lambda *_: model.auto_increment.update(lambda x: not x)),
                         model.auto_increment.map(
                             lambda auto: "Stop Auto-increment" if auto else "Start Auto-increment"
                         ).bind(auto_button, "label"),
@@ -85,9 +81,7 @@ def CounterWidget(
                         css_classes=["destructive-action"],
                         halign=Gtk.Align.CENTER,
                     ),
-                    lambda remove_button: remove_button.connect(
-                        "clicked", lambda *_: on_remove(model)
-                    ),
+                    lambda remove_button: remove_button.connect("clicked", lambda *_: on_remove(model)),
                 ),
             ),
         ),
@@ -182,9 +176,7 @@ def CounterWindow(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindo
                         lambda header_bar: header_bar.pack_start(
                             build(
                                 Gtk.Button(label="Add Counter", css_classes=["suggested-action"]),
-                                lambda add_button: do(
-                                    add_button.connect("clicked", lambda *_: add_counter())
-                                ),
+                                lambda add_button: do(add_button.connect("clicked", lambda *_: add_counter())),
                             ),
                         ),
                     ),
