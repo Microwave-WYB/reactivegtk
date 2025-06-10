@@ -2,8 +2,7 @@ from typing import Callable, Optional
 
 import gi
 
-from reactivegtk import MutableState, Preview
-from reactivegtk.dsl import apply, build, do, unpack_apply
+from reactivegtk import MutableState, Preview, apply
 
 gi.require_versions(
     {
@@ -99,48 +98,48 @@ class CalculatorViewModel:
 
 
 def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
-    return Gtk.WindowHandle(
-        child=build(
-            Gtk.Box(
-                orientation=Gtk.Orientation.VERTICAL,
-                spacing=6,
-                margin_start=12,
-                margin_end=12,
-                margin_top=12,
-                margin_bottom=6,
-            ),
-            lambda box: apply(box.append).foreach(
-                build(
-                    Gtk.Label(
-                        label="",
-                        halign=Gtk.Align.END,
-                        ellipsize=Pango.EllipsizeMode.END,
-                    ),
-                    lambda expression_label: view_model.current_expression.map(lambda expr: expr or "0").bind(
-                        expression_label, "label"
-                    ),
-                ),
-                build(
-                    Gtk.Label(
-                        label="0",
-                        halign=Gtk.Align.END,
-                        css_classes=["title-1"],
-                        ellipsize=Pango.EllipsizeMode.END,
-                    ),
-                    lambda result_label: do(
-                        view_model.result.bind(result_label, "label"),
-                        view_model.has_error.watch(
-                            lambda has_error: (
-                                result_label.add_css_class("error")
-                                if has_error
-                                else result_label.remove_css_class("error")
-                            )
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    )
+    window_handle = Gtk.WindowHandle()
+
+    @apply(window_handle.set_child)
+    def _():
+        box = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=6,
+            margin_start=12,
+            margin_end=12,
+            margin_top=12,
+            margin_bottom=6,
+        )
+
+        @apply(box.append)
+        def _():
+            expression_label = Gtk.Label(
+                label="",
+                halign=Gtk.Align.END,
+                ellipsize=Pango.EllipsizeMode.END,
+            )
+            view_model.current_expression.map(lambda expr: expr or "0").bind(expression_label, "label")
+            return expression_label
+
+        @apply(box.append)
+        def _():
+            result_label = Gtk.Label(
+                label="0",
+                halign=Gtk.Align.END,
+                css_classes=["title-1"],
+                ellipsize=Pango.EllipsizeMode.END,
+            )
+            view_model.result.bind(result_label, "label")
+            view_model.has_error.watch(
+                lambda has_error: (
+                    result_label.add_css_class("error") if has_error else result_label.remove_css_class("error")
+                )
+            )
+            return result_label
+
+        return box
+
+    return window_handle
 
 
 def CalcButton(
@@ -150,34 +149,43 @@ def CalcButton(
     width_request: Optional[int] = None,
     icon: bool = False,
 ) -> Gtk.Button:
-    return build(
-        Gtk.Button(
-            hexpand=True,
-            vexpand=True,
-            can_focus=False,
-        ),
-        lambda button: do(
-            button.set_icon_name(label_or_icon) if icon else button.set_label(label_or_icon),
-            *[button.add_css_class(css_class) for css_class in (css_classes or [])],
-            button.set_size_request(width_request or -1, -1) if width_request else None,
-            button.connect("clicked", lambda *_: on_click()),
-        ),
+    button = Gtk.Button(
+        hexpand=True,
+        vexpand=True,
+        can_focus=False,
     )
+
+    if icon:
+        button.set_icon_name(label_or_icon)
+    else:
+        button.set_label(label_or_icon)
+
+    for css_class in css_classes or []:
+        button.add_css_class(css_class)
+
+    if width_request:
+        button.set_size_request(width_request, -1)
+
+    button.connect("clicked", lambda *_: on_click())
+
+    return button
 
 
 def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
-    return build(
-        Gtk.Grid(
-            row_spacing=6,
-            column_spacing=6,
-            margin_top=12,
-            margin_start=12,
-            margin_end=12,
-            margin_bottom=12,
-            hexpand=True,
-            vexpand=True,
-        ),
-        lambda grid: unpack_apply(grid.attach).foreach(
+    grid = Gtk.Grid(
+        row_spacing=6,
+        column_spacing=6,
+        margin_top=12,
+        margin_start=12,
+        margin_end=12,
+        margin_bottom=12,
+        hexpand=True,
+        vexpand=True,
+    )
+
+    @apply.unpack(grid.attach).foreach
+    def _():
+        return (
             # Row 0: Clear and backspace
             (CalcButton("C", view_model.clear, ["destructive-action"]), 0, 0, 3, 1),
             (
@@ -232,22 +240,30 @@ def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
             ),
             # Row 5: Equals
             (CalcButton("=", view_model.calculate, ["suggested-action"]), 0, 5, 4, 1),
-        ),
-    )
+        )
+
+    return grid
 
 
 def CalculatorView(view_model: CalculatorViewModel) -> Gtk.Box:
-    return build(
-        Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=0,
-        ),
-        lambda box: apply(box.append).foreach(
-            ResultsDisplay(view_model),
-            Gtk.Separator(),
-            Keypad(view_model),
-        ),
+    box = Gtk.Box(
+        orientation=Gtk.Orientation.VERTICAL,
+        spacing=0,
     )
+
+    @apply(box.append)
+    def _():
+        return ResultsDisplay(view_model)
+
+    @apply(box.append)
+    def _():
+        return Gtk.Separator()
+
+    @apply(box.append)
+    def _():
+        return Keypad(view_model)
+
+    return box
 
 
 def CalculatorWindow() -> Adw.Window:
@@ -300,39 +316,36 @@ def CalculatorWindow() -> Adw.Window:
             case _:
                 return False
 
-    return build(
-        Adw.Window(
-            title="Calculator",
-            default_height=400,
-            default_width=300,
-            resizable=True,
-            can_focus=True,
-        ),
-        lambda window: do(
-            window.add_controller(
-                do(
-                    key_controller := Gtk.EventControllerKey(
-                        name="key-controller",
-                        propagation_phase=Gtk.PropagationPhase.CAPTURE,
-                    ),
-                    key_controller.connect(
-                        "key-pressed",
-                        handle_key_press,
-                    ),
-                    ret=key_controller,
-                )
-            ),
-            window.set_content(
-                build(
-                    Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT),
-                    lambda toolbar_view: do(
-                        toolbar_view.add_top_bar(Adw.HeaderBar()),
-                        toolbar_view.set_content(CalculatorView(view_model)),
-                    ),
-                ),
-            ),
-        ),
+    window = Adw.Window(
+        title="Calculator",
+        default_height=400,
+        default_width=300,
+        resizable=True,
+        can_focus=True,
     )
+
+    key_controller = Gtk.EventControllerKey(
+        name="key-controller",
+        propagation_phase=Gtk.PropagationPhase.CAPTURE,
+    )
+    key_controller.connect("key-pressed", handle_key_press)
+    window.add_controller(key_controller)
+
+    @apply(window.set_content)
+    def _():
+        toolbar_view = Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT)
+
+        @apply(toolbar_view.add_top_bar)
+        def _():
+            return Adw.HeaderBar()
+
+        @apply(toolbar_view.set_content)
+        def _():
+            return CalculatorView(view_model)
+
+        return toolbar_view
+
+    return window
 
 
 if __name__ == "__main__":

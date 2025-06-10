@@ -1,12 +1,12 @@
 import asyncio
 from collections.abc import Sequence
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Callable
 
 import gi
 
-from reactivegtk import MutableState, State, effect, start_event_loop
-from reactivegtk.dsl import apply, build, do
+from reactivegtk import MutableState, State, apply, effect, start_event_loop
 from reactivegtk.widgets import Conditional, ReactiveSequence
 
 gi.require_versions(
@@ -38,54 +38,71 @@ def CounterWidget(
 
     model.auto_increment.watch(auto_increment_effect, init=True)
 
-    return build(
-        Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=6,
-            valign=Gtk.Align.CENTER,
-            halign=Gtk.Align.CENTER,
-        ),
-        lambda vbox: do(
-            vbox.connect("destroy", lambda *_: print("Counter widget destroyed")),
-            # Counter controls and buttons
-            apply(vbox.append).foreach(
-                # Count label
-                build(
-                    Gtk.Label(
-                        css_classes=["title-2"],
-                        margin_start=12,
-                        margin_end=12,
-                        valign=Gtk.Align.CENTER,
-                    ),
-                    lambda count_label: model.count.map(str).bind(count_label, "label"),
-                ),
-                # Reset button
-                build(
-                    Gtk.Button(label="Reset", css_classes=["destructive-action"]),
-                    lambda reset_button: reset_button.connect("clicked", lambda *_: model.count.set(0)),
-                ),
-                # Auto-increment toggle
-                build(
-                    Gtk.Button(),
-                    lambda auto_button: do(
-                        auto_button.connect("clicked", lambda *_: model.auto_increment.update(lambda x: not x)),
-                        model.auto_increment.map(
-                            lambda auto: "Stop Auto-increment" if auto else "Start Auto-increment"
-                        ).bind(auto_button, "label"),
-                    ),
-                ),
-                # Remove button
-                build(
-                    Gtk.Button(
-                        label="Remove Counter",
-                        css_classes=["destructive-action"],
-                        halign=Gtk.Align.CENTER,
-                    ),
-                    lambda remove_button: remove_button.connect("clicked", lambda *_: on_remove(model)),
-                ),
-            ),
-        ),
+    vbox = Gtk.Box(
+        orientation=Gtk.Orientation.VERTICAL,
+        spacing=6,
+        valign=Gtk.Align.CENTER,
+        halign=Gtk.Align.CENTER,
     )
+
+    @partial(vbox.connect, "destroy")
+    def _(*_):
+        print("Counter widget destroyed")
+
+    # Count label
+    @apply(vbox.append)
+    def _():
+        count_label = Gtk.Label(
+            css_classes=["title-2"],
+            margin_start=12,
+            margin_end=12,
+            valign=Gtk.Align.CENTER,
+        )
+        model.count.map(str).bind(count_label, "label")
+        return count_label
+
+    # Reset button
+    @apply(vbox.append)
+    def _():
+        reset_button = Gtk.Button(label="Reset", css_classes=["destructive-action"])
+
+        @partial(reset_button.connect, "clicked")
+        def _(*_):
+            model.count.set(0)
+
+        return reset_button
+
+    # Auto-increment toggle
+    @apply(vbox.append)
+    def _():
+        auto_button = Gtk.Button()
+
+        @partial(auto_button.connect, "clicked")
+        def _(*_):
+            model.auto_increment.update(lambda x: not x)
+
+        model.auto_increment.map(lambda auto: "Stop Auto-increment" if auto else "Start Auto-increment").bind(
+            auto_button, "label"
+        )
+
+        return auto_button
+
+    # Remove button
+    @apply(vbox.append)
+    def _():
+        remove_button = Gtk.Button(
+            label="Remove Counter",
+            css_classes=["destructive-action"],
+            halign=Gtk.Align.CENTER,
+        )
+
+        @partial(remove_button.connect, "clicked")
+        def _(*_):
+            on_remove(model)
+
+        return remove_button
+
+    return vbox
 
 
 def CounterFlowBoxChild(
@@ -93,19 +110,22 @@ def CounterFlowBoxChild(
     event_loop: asyncio.AbstractEventLoop,
     on_remove: Callable[[CounterModel], None],
 ) -> Gtk.FlowBoxChild:
-    return Gtk.FlowBoxChild(
-        child=build(
-            Gtk.Box(
-                orientation=Gtk.Orientation.VERTICAL,
-                spacing=6,
-                margin_top=12,
-                margin_bottom=12,
-                margin_start=12,
-                margin_end=12,
-            ),
-            lambda container: container.append(CounterWidget(model, event_loop, on_remove)),
-        ),
-    )
+    flowbox_child = Gtk.FlowBoxChild()
+
+    @apply(flowbox_child.set_child)
+    def _():
+        container = Gtk.Box(
+            orientation=Gtk.Orientation.VERTICAL,
+            spacing=6,
+            margin_top=12,
+            margin_bottom=12,
+            margin_start=12,
+            margin_end=12,
+        )
+        container.append(CounterWidget(model, event_loop, on_remove))
+        return container
+
+    return flowbox_child
 
 
 def CounterList(
@@ -149,59 +169,71 @@ def CounterWindow(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindo
     def remove_counter(model: CounterModel):
         models.update(lambda ms: [m for m in ms if m is not model])
 
-    return Adw.ApplicationWindow(
+    window = Adw.ApplicationWindow(
         title="Counter App",
         default_width=800,
         default_height=600,
-        content=build(
-            Adw.ToolbarView(
-                content=Gtk.ScrolledWindow(
-                    hexpand=True,
-                    vexpand=True,
-                    has_frame=False,
-                    hscrollbar_policy=Gtk.PolicyType.NEVER,
-                    vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
-                    child=Adw.Clamp(
-                        maximum_size=900,
-                        tightening_threshold=600,
-                        child=CounterList(models, event_loop, remove_counter),
-                    ),
-                ),
-            ),
-            lambda toolbar_view: do(
-                # Header bar with add button
-                toolbar_view.add_top_bar(
-                    build(
-                        Adw.HeaderBar(),
-                        lambda header_bar: header_bar.pack_start(
-                            build(
-                                Gtk.Button(label="Add Counter", css_classes=["suggested-action"]),
-                                lambda add_button: do(add_button.connect("clicked", lambda *_: add_counter())),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
     )
+
+    @apply(window.set_content)
+    def _():
+        toolbar_view = Adw.ToolbarView()
+
+        # Set main content
+        @apply(toolbar_view.set_content)
+        def _():
+            scrolled = Gtk.ScrolledWindow(
+                hexpand=True,
+                vexpand=True,
+                has_frame=False,
+                hscrollbar_policy=Gtk.PolicyType.NEVER,
+                vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
+            )
+
+            @apply(scrolled.set_child)
+            def _():
+                clamp = Adw.Clamp(
+                    maximum_size=900,
+                    tightening_threshold=600,
+                )
+                clamp.set_child(CounterList(models, event_loop, remove_counter))
+                return clamp
+
+            return scrolled
+
+        # Header bar with add button
+        @apply(toolbar_view.add_top_bar)
+        def _():
+            header_bar = Adw.HeaderBar()
+
+            @apply(header_bar.pack_start)
+            def _():
+                add_button = Gtk.Button(label="Add Counter", css_classes=["suggested-action"])
+
+                @partial(add_button.connect, "clicked")
+                def _(*_):
+                    add_counter()
+
+                return add_button
+
+            return header_bar
+
+        return toolbar_view
+
+    return window
 
 
 def App() -> Adw.Application:
-    event_loop, _ = start_event_loop()
-    return build(
-        Adw.Application(application_id="com.example.CounterApp"),
-        lambda app: do(
-            app.connect(
-                "activate",
-                lambda *_: do(
-                    event_loop,
-                    window := CounterWindow(event_loop),
-                    window.set_application(app),
-                    window.present(),
-                ),
-            ),
-        ),
-    )
+    event_loop, thread = start_event_loop()
+    app = Adw.Application(application_id="com.example.CounterApp")
+
+    @partial(app.connect, "activate")
+    def _(*_):
+        window = CounterWindow(event_loop)
+        window.set_application(app)
+        window.present()
+
+    return app
 
 
 if __name__ == "__main__":

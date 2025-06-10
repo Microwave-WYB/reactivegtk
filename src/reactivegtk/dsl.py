@@ -1,112 +1,86 @@
-from typing import Any, Callable, Generic, TypeVar
+from collections.abc import Callable, Iterable
+from typing import Any, Generic, TypeVar
 
 from typing_extensions import TypeVarTuple, Unpack
 
-T = TypeVar("T")
+InnerT = TypeVar("InnerT")
 Ts = TypeVarTuple("Ts")
 
 
-def build(target: T, action: Callable[[T], Any], /) -> T:
-    """
-    Apply actions to the target
+class apply(Generic[InnerT]):
+    class unpack(Generic[Unpack[Ts]]):
+        def __init__(self, outer_fn: Callable[[Unpack[Ts]], Any]) -> None:
+            self.outer_fn = outer_fn
 
-    >>> build([], lambda lst: lst.append(1))
-    [1]
-    """
-    action(target)
-    return target
+        def __call__(self, inner_fn: Callable[[], tuple[Unpack[Ts]]]) -> Callable[[], tuple[Unpack[Ts]]]:
+            """
+            Call a function immediately with the unpacked result of decorated function.
 
+            >>> nums = [1, 2, 3]
+            >>> def append_max_of(a: int, b: int) -> None:
+            ...     nums.append(max(a, b))
 
-def do(*_: Any, ret: T = None) -> T:
-    """
-    Allow eager execution of actions, return ret if provided.
+            >>> @apply.unpack(append_max_of)
+            ... def _() -> tuple[int, int]:
+            ...     return 4, 5
+            >>> nums
+            [1, 2, 3, 5]
+            """
+            result = inner_fn()
+            self.outer_fn(*result)
+            return lambda: result
 
-    >>> do(
-    ...     print("Hello"),
-    ...     ret=42,
-    ... )
-    Hello
-    42
+        def foreach(
+            self, inner_fn: Callable[[], Iterable[tuple[Unpack[Ts]]]]
+        ) -> Callable[[], Iterable[tuple[Unpack[Ts]]]]:
+            """
+            Transform a decorator to work on each item in an iterable.
 
-    >>> do(
-    ...    num1 := max(1, 2),
-    ...    num2 := min(3, 4),
-    ...    ret=num1 + num2,
-    ... )
-    5
-    """
-    return ret
+            >>> nums = [1, 2, 3]
+            >>> def append_max_of(a: int, b: int) -> None:
+            ...     nums.append(max(a, b))
 
+            >>> @apply.unpack(append_max_of).foreach
+            ... def _() -> Iterable[tuple[int, int]]:
+            ...     return [(4, 5), (6, 7), (8, 9)]
+            >>> nums
+            [1, 2, 3, 5, 7, 9]
+            """
+            result = inner_fn()
+            for item in result:
+                self.outer_fn(*item)
+            return lambda: result
 
-class attempt(Generic[T]):
-    def __init__(self, fn: Callable[[], T]) -> None:
-        self._fn = fn
+    def __init__(self, outer_fn: Callable[[InnerT], Any]) -> None:
+        self.outer_fn = outer_fn
 
-    def catch(self, handler: Callable[[Exception], T]) -> "T":
+    def __call__(self, inner_fn: Callable[[], InnerT]) -> Callable[[], InnerT]:
         """
-        Catch exceptions and return a new attempt with the result of the handler.
+        Call a function immediately with the result of decorated function.
 
-        >>> attempt(lambda: 1 / 0).catch(lambda e: -1)
-        -1
+        >>> nums = [1, 2, 3]
+        >>> @apply(nums.append)
+        ... def _():
+        ...     return 4
+        >>> nums
+        [1, 2, 3, 4]
         """
-        try:
-            return self._fn()
-        except Exception as e:
-            return handler(e)
+        result = inner_fn()
+        self.outer_fn(result)
+        return lambda: result
 
-    def orelse(self, fallback: T) -> T:
+    def foreach(self, inner_fn: Callable[[], Iterable[InnerT]]) -> Callable[[], Iterable[InnerT]]:
         """
-        Return the result of the function execution or the fallback value if an exception occurred.
+        Transform a decorator to work on each item in an iterable.
 
-        >>> attempt(lambda: 1 / 0).orelse(-1)
-        -1
+        >>> nums = [1, 2, 3]
+        >>> @apply(nums.append).foreach
+        ... def _():
+        ...     return [4, 5, 6]
+        >>> nums
+        [1, 2, 3, 4, 5, 6]
         """
-        try:
-            return self._fn()
-        except Exception:
-            return fallback
-
-    def __call__(self) -> T:
-        """
-        Return the result of the function execution or raise the exception if it occurred.
-        >>> attempt(lambda: 1)()
-        1
-        >>> attempt(lambda: 1 / 0)()
-        Traceback (most recent call last):
-        ...
-        ZeroDivisionError: division by zero
-        """
-        return self._fn()
-
-
-class apply(Generic[T]):
-    """
-    >>> nums = []
-    >>> _ = apply(nums.append).foreach(1, 2, 3)
-    >>> nums
-    [1, 2, 3]
-    """
-
-    def __init__(self, fn: Callable[[T], Any]) -> None:
-        self._fn = fn
-
-    def foreach(self, *items: T) -> None:
-        """Apply the function to each item in the iterable."""
-        for item in items:
-            self._fn(item)
-
-
-class unpack_apply(Generic[Unpack[Ts]]):
-    """
-    >>> nums = []
-    >>> _ = unpack_apply(nums.append).foreach((1,), (2,), (3,))
-    >>> nums
-    [1, 2, 3]
-    """
-
-    def __init__(self, fn: Callable[[Unpack[Ts]], Any]) -> None:
-        self._fn = fn
-
-    def foreach(self, *items: tuple[Unpack[Ts]]) -> None:
-        for item in items:
-            self._fn(*item)
+        result = inner_fn()
+        for item in result:
+            self.outer_fn(item)
+        return lambda: result

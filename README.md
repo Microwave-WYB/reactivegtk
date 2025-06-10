@@ -168,10 +168,10 @@ The same application built with ReactiveGTK's declarative DSL:
 ![Hello World Demo](assets/hello.gif)
 
 ```python
+from functools import partial
 import gi
 
-from reactivegtk import MutableState
-from reactivegtk.dsl import apply, build, do
+from reactivegtk import MutableState, apply
 
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
@@ -181,52 +181,45 @@ def HelloWorld():
     # Create reactive state
     name = MutableState("")
 
-    return build(
-        Gtk.Box(
-            orientation=Gtk.Orientation.VERTICAL,
-            spacing=12,
-            halign=Gtk.Align.CENTER,
-            valign=Gtk.Align.CENTER,
-        ),
-        lambda box: do(
-            apply(box.append).foreach(
-                build(
-                    Gtk.Entry(placeholder_text="Enter your name...", width_request=200),
-                    lambda entry: do(
-                        name.twoway_bind(entry, "text"),
-                        entry.connect(
-                            "activate",
-                            lambda *_: do(
-                                print(f"Entry activated with text: {name.value}"),
-                                print("Multiple prints are possible with do function"),
-                            ),
-                        ),
-                    ),
-                ),
-                build(
-                    Gtk.Label(css_classes=["title-1"]),
-                    lambda label: name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label"),
-                ),
-            ),
-        ),
+    box = Gtk.Box(
+        orientation=Gtk.Orientation.VERTICAL,
+        spacing=12,
+        halign=Gtk.Align.CENTER,
+        valign=Gtk.Align.CENTER,
     )
+
+    @apply(box.append)
+    def _():
+        entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
+        name.twoway_bind(entry, "text")
+        
+        @partial(entry.connect, "activate")
+        def _(*_):
+            print(f"Entry activated with text: {name.value}")
+            print("Multiple prints are possible with multiple statements")
+        
+        return entry
+
+    @apply(box.append)
+    def _():
+        label = Gtk.Label(css_classes=["title-1"])
+        name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label")
+        return label
+
+    return box
 
 
 # Create and run the app
 def App():
-    return build(
-        Adw.Application(application_id="com.example.HelloWorld"),
-        lambda app: do(
-            app.connect(
-                "activate",
-                lambda *_: do(
-                    window := Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK (Declarative)"),
-                    window.set_content(HelloWorld()),
-                    window.present(),
-                ),
-            ),
-        ),
-    )
+    app = Adw.Application(application_id="com.example.HelloWorld")
+
+    @partial(app.connect, "activate")
+    def _(*_):
+        window = Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK (Declarative)")
+        window.set_content(HelloWorld())
+        window.present()
+
+    return app
 
 
 if __name__ == "__main__":
@@ -237,7 +230,7 @@ if __name__ == "__main__":
 - ✅ **Declarative syntax** - describe what you want, not how to do it
 - ✅ **Reactive state** - UI updates automatically when state changes
 - ✅ **Two-way data binding** - no manual synchronization needed
-- ✅ **Functional composition** - build complex UIs from simple functions
+- ✅ **Clean DSL** - build complex UIs with simple decorator patterns
 - ✅ **Type-safe** - catch errors at development time
 
 ## Core Concepts
@@ -303,8 +296,8 @@ Handle side effects and asynchronous operations with the `@effect` decorator:
 
 ```python
 import asyncio
-from reactivegtk import effect, start_event_loop
-from reactivegtk.dsl import build, do, apply
+from functools import partial
+from reactivegtk import effect, start_event_loop, apply
 
 # Start the async event loop (call once in your app)
 event_loop, thread = start_event_loop()
@@ -323,87 +316,79 @@ def AutoIncrementingCounter():
     # Watch state changes and pass value to effect
     auto_enabled.watch(auto_increment_effect, init=True)
     
-    return build(
-        Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12),
-        lambda box: apply(box.append).foreach(
-            build(
-                Gtk.Label(css_classes=["title-1"]),
-                lambda label: count.map(lambda x: f"Count: {x}").bind(label, "label")
-            ),
-            build(
-                Gtk.Button(label="Reset"),
-                lambda button: button.connect("clicked", lambda *_: count.set(0))
-            ),
-            build(
-                Gtk.Button(),
-                lambda button: do(
-                    auto_enabled.map(
-                        lambda enabled: "Stop Auto-increment" if enabled else "Start Auto-increment"
-                    ).bind(button, "label"),
-                    button.connect(
-                        "clicked", 
-                        lambda *_: auto_enabled.update(lambda x: not x)
-                    )
-                )
-            )
-        )
-    )
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+    
+    @apply(box.append)
+    def _():
+        label = Gtk.Label(css_classes=["title-1"])
+        count.map(lambda x: f"Count: {x}").bind(label, "label")
+        return label
+    
+    @apply(box.append)
+    def _():
+        button = Gtk.Button(label="Reset")
+        
+        @partial(button.connect, "clicked")
+        def _(*_):
+            count.set(0)
+        
+        return button
+    
+    @apply(box.append)
+    def _():
+        button = Gtk.Button()
+        auto_enabled.map(
+            lambda enabled: "Stop Auto-increment" if enabled else "Start Auto-increment"
+        ).bind(button, "label")
+        
+        @partial(button.connect, "clicked")
+        def _(*_):
+            auto_enabled.update(lambda x: not x)
+        
+        return button
+    
+    return box
 ```
 
 ### 4. Declarative DSL
 
-ReactiveGTK provides a functional DSL for building UIs. Here's how each component works:
+ReactiveGTK provides a declarative DSL for building UIs using decorator patterns:
 
-#### `build(target, action)`
+#### `@apply(function)` - Single Item
 
-Creates and configures widgets by applying actions to them:
+Configure widgets by applying a function that returns the configured widget:
 
 ```python
-from reactivegtk.dsl import build
+from functools import partial
+from reactivegtk import apply
 
-# Simple example - create and configure a widget
-button = build(
-    Gtk.Button(label="Click me"),
-    lambda btn: btn.connect("clicked", lambda *_: print("Clicked!"))
-)
+# Create a box and add a configured button
+box = Gtk.Box()
 
-# Returns the configured button widget
+@apply(box.append)
+def _():
+    button = Gtk.Button(label="Click me")
+    
+    @partial(button.connect, "clicked")
+    def _(*_):
+        print("Clicked!")
+    
+    return button
 ```
 
-#### `do(*actions)`
+#### `@apply(function).foreach` - Multiple Items
 
-Executes multiple actions in sequence, useful for side effects:
-
-```python
-from reactivegtk.dsl import do
-
-# Execute multiple actions
-do(
-    print("Setting up widget"),
-    name.twoway_bind(entry, "text"),
-    entry.connect("activate", lambda *_: print("Activated"))
-)
-
-# Can also return a value
-result = do(
-    print("Computing..."),
-    ret=42  # Returns 42
-)
-```
-
-#### `apply(function).foreach(*items)`
-
-Applies a function to multiple items, perfect for adding multiple children:
+Apply a function to multiple similar items:
 
 ```python
-from reactivegtk.dsl import apply
-
 # Add multiple widgets to a container
-apply(box.append).foreach(
-    Gtk.Label(label="First"),
-    Gtk.Label(label="Second"), 
-    Gtk.Button(label="Third")
-)
+@apply(box.append).foreach
+def _():
+    return (
+        Gtk.Label(label="First"),
+        Gtk.Label(label="Second"), 
+        Gtk.Button(label="Third")
+    )
 
 # Works with any function - equivalent to:
 # box.append(Gtk.Label(label="First"))
@@ -411,45 +396,70 @@ apply(box.append).foreach(
 # box.append(Gtk.Button(label="Third"))
 ```
 
-#### `attempt(function)`
+#### `@apply.unpack(function)` - Single Tuple Unpacking
 
-Handles potential errors gracefully:
-
-```python
-from reactivegtk.dsl import attempt
-
-# Try an operation that might fail
-result = attempt(lambda: risky_operation()).orelse("fallback")
-
-# Or handle specific exceptions
-result = attempt(lambda: int("not_a_number")).catch(lambda e: 0)
-```
-
-#### `unpack_apply(function).foreach(*tuples)`
-
-Like `apply`, but unpacks tuples as arguments. Perfect for grid layouts:
+For unpacking a single tuple as function arguments:
 
 ```python
-from reactivegtk.dsl import unpack_apply
-
-# Attach multiple widgets to a grid with position and span data
-# Each tuple contains: (widget, column, row, width, height)
+# Attach a single widget to a grid with position data
 grid = Gtk.Grid()
 
-unpack_apply(grid.attach).foreach(
-    (Gtk.Button(label="Clear"), 0, 0, 3, 1),  # spans 3 columns
-    (Gtk.Button(label="7"), 0, 1, 1, 1),
-    (Gtk.Button(label="8"), 1, 1, 1, 1), 
-    (Gtk.Button(label="9"), 2, 1, 1, 1),
-    (Gtk.Button(label="÷"), 3, 1, 1, 1),
-    # ... more buttons
-)
+@apply.unpack(grid.attach)
+def _():
+    button = Gtk.Button(label="Submit")
+    return (button, 0, 0, 2, 1)  # widget, column, row, width, height
+
+# This is equivalent to: grid.attach(button, 0, 0, 2, 1)
+```
+
+#### `@apply.unpack(function).foreach` - Multiple Tuple Arguments
+
+Perfect for grid layouts where you need to unpack multiple tuples:
+
+```python
+# Attach multiple widgets to a grid with position and span data
+grid = Gtk.Grid()
+
+@apply.unpack(grid.attach).foreach
+def _():
+    return (
+        (Gtk.Button(label="Clear"), 0, 0, 3, 1),  # spans 3 columns
+        (Gtk.Button(label="7"), 0, 1, 1, 1),
+        (Gtk.Button(label="8"), 1, 1, 1, 1), 
+        (Gtk.Button(label="9"), 2, 1, 1, 1),
+        (Gtk.Button(label="÷"), 3, 1, 1, 1),
+        # ... more buttons
+    )
 
 # This is equivalent to:
 # grid.attach(Gtk.Button(label="Clear"), 0, 0, 3, 1)
 # grid.attach(Gtk.Button(label="7"), 0, 1, 1, 1)
-# grid.attach(Gtk.Button(label="8"), 1, 1, 1, 1)
 # etc.
+```
+
+#### Signal Connections with `@partial`
+
+Use `@partial` for clean signal connections:
+
+```python
+from functools import partial
+
+button = Gtk.Button(label="Click me")
+
+@partial(button.connect, "clicked")
+def _(*_):
+    print("Button clicked!")
+
+# For signals with multiple handlers
+entry = Gtk.Entry()
+
+@partial(entry.connect, "activate")
+def _(*_):
+    print("Entry activated")
+
+@partial(entry.connect, "changed")
+def _(*_):
+    print("Entry text changed")
 ```
 
 ### 5. Preview System
@@ -469,10 +479,7 @@ def hello_preview(_):
 # Without name - uses function name automatically
 @preview
 def MyLabel(_):
-    return build(
-        Gtk.Label(label="Hello from preview!"),
-        lambda label: do()  # No additional setup needed
-    )
+    return Gtk.Label(label="Hello from preview!")
 
 if __name__ == "__main__":
     preview.run()  # Start preview server
@@ -505,9 +512,11 @@ The preview application creates a navigatable window with your components displa
 
 ### DSL Functions
 
-- `build(widget, setup_func)`: Create and configure a widget
-- `do(*actions)`: Execute multiple actions in sequence
-- `apply(func).foreach(*items)`: Apply a function to multiple items
+- `@apply(func)`: Configure a single widget with a function
+- `@apply(func).foreach`: Apply a function to multiple items
+- `@apply.unpack(func)`: Apply a function to a single tuple, unpacking the tuple as arguments
+- `@apply.unpack(func).foreach`: Apply a function to multiple tuples, unpacking each tuple as arguments
+- `@partial(obj.method, arg)`: Clean signal connection pattern
 
 ### Effects
 
