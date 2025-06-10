@@ -31,6 +31,7 @@ class State(Generic[T]):
     def __init__(self, value: T):
         self._gobject: _StateData[T] = _StateData(value)
         self._connections: weakref.WeakSet[Connection] = weakref.WeakSet()
+        self._bindings: weakref.WeakSet[GObject.Binding] = weakref.WeakSet()
         self._derived_states: weakref.WeakSet["State"] = weakref.WeakSet()
 
     @property
@@ -91,7 +92,7 @@ class State(Generic[T]):
     ) -> GObject.Binding:
         """Bind this state's value to a target object's property."""
         flags = GObject.BindingFlags.SYNC_CREATE
-        return self._gobject.bind_property(
+        biniding = self._gobject.bind_property(
             "value",
             target_object,
             target_property,
@@ -99,6 +100,8 @@ class State(Generic[T]):
             lambda binding, value: value,
             lambda binding, value: value,
         )
+        self._bindings.add(biniding)
+        return biniding
 
     def watch(
         self,
@@ -122,13 +125,16 @@ class State(Generic[T]):
     def cleanup(self):
         """Cleanup all connections and references."""
         # Cleanup all derived states first
-        for derived_state in list(self._derived_states):
+        for derived_state in self._derived_states:
             if derived_state is not None:
                 derived_state.cleanup()
         self._derived_states.clear()
 
+        for binding in self._bindings:
+            binding.unbind()
+
         # Disconnect any remaining connections
-        for connection in list(self._connections):
+        for connection in self._connections:
             if connection.is_valid():
                 connection.disconnect()
         self._connections.clear()
@@ -157,7 +163,7 @@ class MutableState(State[T]):
     ) -> GObject.Binding:
         """Create a two-way binding with a target object's property."""
         flags = GObject.BindingFlags.SYNC_CREATE | GObject.BindingFlags.BIDIRECTIONAL
-        return self._gobject.bind_property(
+        binding = self._gobject.bind_property(
             "value",
             target_object,
             target_property,
@@ -165,3 +171,5 @@ class MutableState(State[T]):
             lambda binding, value: value,
             lambda binding, value: value,
         )
+        self._bindings.add(binding)
+        return binding

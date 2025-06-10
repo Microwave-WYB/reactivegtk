@@ -5,8 +5,6 @@ from typing_extensions import TypeVarTuple, Unpack
 T = TypeVar("T")
 Ts = TypeVarTuple("Ts")
 
-Supplier = Callable[[], T]
-
 
 def build(target: T, action: Callable[[T], Any], /) -> T:
     """
@@ -22,6 +20,10 @@ def build(target: T, action: Callable[[T], Any], /) -> T:
 def do(*_: Any, ret: T = None) -> T:
     """
     Allow eager execution of actions, return ret if provided.
+
+    >>> do(print("Hello"), ret=42)
+    Hello
+    42
     """
     return ret
 

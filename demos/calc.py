@@ -1,8 +1,9 @@
-import gi
 from typing import Callable, Optional
 
-from reactivegtk import MutableState, Preview, WidgetLifecycle
-from reactivegtk.dsl import apply, do, build, unpack_apply
+import gi
+
+from reactivegtk import MutableState, Preview
+from reactivegtk.dsl import apply, build, do, unpack_apply
 
 gi.require_versions(
     {
@@ -58,13 +59,7 @@ class CalculatorViewModel:
 
         current = self.current_expression.value
 
-        parts = (
-            current.replace("+", "|")
-            .replace("-", "|")
-            .replace("*", "|")
-            .replace("/", "|")
-            .split("|")
-        )
+        parts = current.replace("+", "|").replace("-", "|").replace("*", "|").replace("/", "|").split("|")
         if parts and "." not in parts[-1]:
             if not current or current[-1] in "+-*/":
                 self.current_expression.update(lambda expr: expr + "0.")
@@ -121,9 +116,9 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
                         halign=Gtk.Align.END,
                         ellipsize=Pango.EllipsizeMode.END,
                     ),
-                    lambda expression_label: view_model.current_expression.map(
-                        lambda expr: expr or "0"
-                    ).bind(expression_label, "label"),
+                    lambda expression_label: view_model.current_expression.map(lambda expr: expr or "0").bind(
+                        expression_label, "label"
+                    ),
                 ),
                 build(
                     Gtk.Label(
@@ -163,10 +158,9 @@ def CalcButton(
         ),
         lambda button: do(
             button.set_icon_name(label_or_icon) if icon else button.set_label(label_or_icon),
-            lifecycle := WidgetLifecycle(button),
             *[button.add_css_class(css_class) for css_class in (css_classes or [])],
             button.set_size_request(width_request or -1, -1) if width_request else None,
-            lifecycle.subscribe(button, "clicked")(lambda *_: on_click()),
+            button.connect("clicked", lambda *_: on_click()),
         ),
     )
 
@@ -315,14 +309,16 @@ def CalculatorWindow() -> Adw.Window:
             can_focus=True,
         ),
         lambda window: do(
-            lifecycle := WidgetLifecycle(window),
             window.add_controller(
                 do(
                     key_controller := Gtk.EventControllerKey(
                         name="key-controller",
                         propagation_phase=Gtk.PropagationPhase.CAPTURE,
                     ),
-                    lifecycle.subscribe(key_controller, "key-pressed")(handle_key_press),
+                    key_controller.connect(
+                        "key-pressed",
+                        handle_key_press,
+                    ),
                     ret=key_controller,
                 )
             ),

@@ -4,7 +4,6 @@ from typing import Any, Callable, TypeVar, overload
 
 import gi
 
-from reactivegtk.lifecycle import watch, cleanup
 from reactivegtk.sequence_binding._diff import diff_update
 from reactivegtk.state import State
 
@@ -66,7 +65,6 @@ def bind_sequence(
         def remove_widget_from_container(widget: Gtk.Widget) -> None:
             """Remove widget from container and clean up tracking."""
             remove_widget(container, widget)
-            cleanup(widget)
 
             # Remove from tracking dict
             for key, tracked_widget in list(state["widget_by_key"].items()):
@@ -84,9 +82,8 @@ def bind_sequence(
             state["widget_by_key"][key_fn(item)] = widget
             return widget
 
-        def sync_items():
+        def sync_items(new_items: Sequence[ItemT]):
             """Sync container using efficient diff algorithm."""
-            new_items = tuple(items.value)
 
             diff_update(
                 container=None,  # We don't actually need this if we pass functions directly
@@ -101,9 +98,7 @@ def bind_sequence(
 
             state["current_items"] = new_items
 
-        @watch(container, items, init=True)
-        def _(_):
-            sync_items()
+        items.watch(sync_items, init=True)
 
     return decorator
 

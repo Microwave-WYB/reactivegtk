@@ -3,9 +3,9 @@ from typing import Callable
 
 import gi
 
-from reactivegtk import MutableState, Preview, State, WidgetLifecycle
-from reactivegtk.widgets import Conditional, ReactiveSequence
+from reactivegtk import MutableState, Preview, State
 from reactivegtk.dsl import apply, build, do
+from reactivegtk.widgets import Conditional, ReactiveSequence
 
 gi.require_versions(
     {
@@ -42,7 +42,6 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
     return build(
         Adw.ActionRow(),
         lambda row: do(
-            lifecycle := WidgetLifecycle(row),
             task.title.bind(row, "title"),
             row.add_prefix(
                 build(
@@ -61,9 +60,7 @@ def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) 
                         css_classes=["circular", "destructive-action"],
                         tooltip_text="Remove task",
                     ),
-                    lambda remove_button: lifecycle.subscribe(remove_button, "clicked")(
-                        lambda *_: on_remove(task),
-                    ),
+                    lambda remove_button: remove_button.connect("clicked", lambda *_: on_remove(task)),
                 ),
             ),
         ),
@@ -125,23 +122,21 @@ class TodoViewModel:
         total_count = len(self._tasks.value)
         self._stats.set((done_count, total_count))
 
-    def add_task(self, text: str) -> None:
-        text = text.strip()
+    def add_task(self) -> None:
+        text = self._entry_text.value.strip()
         if not text:
             return None
         new_task = TaskViewModel(text)
         new_task._done.watch(lambda _: self.update_stats(), init=True)
 
         self._tasks.update(lambda ts: [*ts, new_task])
+        self._entry_text.set("")
 
     def remove_task(self, task: TaskViewModel):
         self._tasks.update(lambda ts: [t for t in ts if t is not task])
 
     def set_entry_text(self, text: str) -> None:
         self._entry_text.set(text)
-
-    def clear_entry_text(self) -> None:
-        self._entry_text.set("")
 
 
 def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
@@ -176,7 +171,6 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
             margin_end=12,
         ),
         lambda clamp: do(
-            (lifecycle := WidgetLifecycle(clamp)),
             clamp.set_child(
                 build(
                     Gtk.Box(
@@ -194,24 +188,16 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                             lambda entry_box: apply(entry_box.append).foreach(
                                 build(
                                     TaskEntry(),
-                                    lambda entry: do(
-                                        lifecycle.subscribe(entry, "activate")(
-                                            lambda *_: do(
-                                                view_model.add_task(view_model.entry_text.value),
-                                                view_model.clear_entry_text(),
-                                            ),
-                                        ),
+                                    lambda entry: entry.connect(
+                                        "activate",
+                                        lambda *_: view_model.add_task(),
                                     ),
                                 ),
                                 build(
                                     TaskAddButton(),
-                                    lambda add_button: do(
-                                        lifecycle.subscribe(add_button, "clicked")(
-                                            lambda *_: do(
-                                                view_model.add_task(view_model.entry_text.value),
-                                                view_model.clear_entry_text(),
-                                            ),
-                                        ),
+                                    lambda add_button: add_button.connect(
+                                        "clicked",
+                                        lambda *_: view_model.add_task(),
                                     ),
                                 ),
                             ),

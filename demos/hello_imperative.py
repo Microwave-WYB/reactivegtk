@@ -1,5 +1,7 @@
 import gi
 
+from reactivegtk import MutableState
+
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
 from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 
@@ -13,27 +15,24 @@ class HelloWorldWidget(Gtk.Box):
             valign=Gtk.Align.CENTER,
         )
 
-        self.name = ""
+        # Use ReactiveGTK state management
+        self.name = MutableState("")
 
+        # Create and configure entry
         self.entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
         self.entry.connect("activate", self._on_entry_activate)
-        self.entry.connect("changed", self._on_entry_changed)
         self.append(self.entry)
 
+        # Create label
         self.label = Gtk.Label(css_classes=["title-1"])
-        self._update_label()
         self.append(self.label)
 
+        # Set up reactive bindings
+        self.name.twoway_bind(self.entry, "text")
+        self.name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(self.label, "label")
+
     def _on_entry_activate(self, entry: Gtk.Entry) -> None:
-        print(f"Entry activated with text: {self.name}")
-
-    def _on_entry_changed(self, entry: Gtk.Entry) -> None:
-        self.name = entry.get_text()
-        self._update_label()
-
-    def _update_label(self) -> None:
-        text = f"Hello, {self.name}!" if self.name else "Hello, ...!"
-        self.label.set_text(text)
+        print(f"Entry activated with text: {self.name.value}")
 
 
 class App(Adw.Application):
@@ -42,7 +41,7 @@ class App(Adw.Application):
         self.connect("activate", self._on_activate)
 
     def _on_activate(self, app):
-        window = Adw.ApplicationWindow(application=app, title="Hello Traditional GTK")
+        window = Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK (Imperative)")
         window.set_content(HelloWorldWidget())
         window.present()
 

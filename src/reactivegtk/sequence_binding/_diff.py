@@ -104,9 +104,7 @@ def compute_diff_operations(
 
     # Separate keys into different categories
     deleted_keys = {key for key in old_key_to_index if key not in new_key_to_index}
-    moved_keys = {
-        key for key in old_key_to_index if key in new_key_to_index and key not in items_to_keep
-    }
+    moved_keys = {key for key in old_key_to_index if key in new_key_to_index and key not in items_to_keep}
     new_keys_only = {key for key in new_key_to_index if key not in old_key_to_index}
 
     # 1. Remove deleted items first

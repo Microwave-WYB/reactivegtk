@@ -1,12 +1,10 @@
 import asyncio
-from typing import Callable, overload
 from collections.abc import Sequence
+from typing import Callable, overload
 
 import gi
 
 from reactivegtk.dsl import apply, build, do
-from reactivegtk.widgets import Conditional
-from reactivegtk.lifecycle import WidgetLifecycle
 from reactivegtk.state import MutableState, State
 from reactivegtk.utils import start_event_loop
 
@@ -21,7 +19,7 @@ class PreviewViewModel:
         self._widgets = widgets
         self._widget_names = list(widgets.keys())
 
-        # Reactive state
+        # State properties
         self._selected_widget = MutableState(self._widget_names[0] if self._widget_names else "")
         self._show_sidebar = MutableState(True)
         self._reload_trigger = MutableState(0)
@@ -77,9 +75,7 @@ class PreviewViewModel:
         except Exception as e:
             return self._create_error_widget(f"Error creating '{name}': {str(e)}")
 
-    def _create_window_launcher(
-        self, name: str, event_loop: asyncio.AbstractEventLoop
-    ) -> Gtk.Widget:
+    def _create_window_launcher(self, name: str, event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
         """Create a button that launches a window when clicked."""
         return build(
             Gtk.Box(
@@ -88,28 +84,26 @@ class PreviewViewModel:
                 halign=Gtk.Align.CENTER,
                 valign=Gtk.Align.CENTER,
             ),
-            lambda box: (
-                (lifecycle := WidgetLifecycle(box)),
-                apply(box.append).foreach(
-                    build(
-                        Gtk.Button(
-                            label=f"Launch {name}",
-                            css_classes=["suggested-action", "pill"],
-                            halign=Gtk.Align.CENTER,
-                        ),
-                        lambda button: lifecycle.subscribe(button, "clicked")(
-                            lambda *_: do(
-                                window := self._widgets[name](event_loop),
-                                window.present() if isinstance(window, Gtk.Window) else None,
-                            )
+            lambda box: apply(box.append).foreach(
+                build(
+                    Gtk.Button(
+                        label=f"Launch {name}",
+                        css_classes=["suggested-action", "pill"],
+                        halign=Gtk.Align.CENTER,
+                    ),
+                    lambda button: button.connect(
+                        "clicked",
+                        lambda *_: do(
+                            window := self._widgets[name](event_loop),
+                            window.present() if isinstance(window, Gtk.Window) else None,
                         ),
                     ),
-                    Gtk.Label(
-                        label="This is a window widget. Click the button above to launch it.",
-                        css_classes=["dim-label"],
-                        wrap=True,
-                        justify=Gtk.Justification.CENTER,
-                    ),
+                ),
+                Gtk.Label(
+                    label="This is a window widget. Click the button above to launch it.",
+                    css_classes=["dim-label"],
+                    wrap=True,
+                    justify=Gtk.Justification.CENTER,
                 ),
             ),
         )
@@ -147,18 +141,13 @@ def HeaderBar(view_model: PreviewViewModel) -> Adw.HeaderBar:
     return build(
         Adw.HeaderBar(),
         lambda header_bar: do(
-            (lifecycle := WidgetLifecycle(header_bar)),
             # Sidebar toggle
             header_bar.pack_start(
                 build(
-                    Gtk.ToggleButton(
-                        icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar"
-                    ),
-                    lambda toggle_button: (
+                    Gtk.ToggleButton(icon_name="sidebar-show-symbolic", tooltip_text="Toggle Sidebar"),
+                    lambda toggle_button: do(
                         view_model.show_sidebar.bind(toggle_button, "active"),
-                        lifecycle.subscribe(toggle_button, "toggled")(
-                            lambda *_: view_model.set_sidebar_visible(toggle_button.get_active())
-                        ),
+                        toggle_button.connect("toggled", lambda btn: view_model.set_sidebar_visible(btn.get_active())),
                     ),
                 ),
             ),
@@ -170,9 +159,7 @@ def HeaderBar(view_model: PreviewViewModel) -> Adw.HeaderBar:
                         tooltip_text="Reload Content",
                         sensitive=view_model.has_widgets,
                     ),
-                    lambda reload_button: lifecycle.subscribe(reload_button, "clicked")(
-                        lambda *_: view_model.reload()
-                    ),
+                    lambda reload_button: reload_button.connect("clicked", lambda *_: view_model.reload()),
                 ),
             ),
         ),
@@ -182,58 +169,47 @@ def HeaderBar(view_model: PreviewViewModel) -> Adw.HeaderBar:
 def Sidebar(view_model: PreviewViewModel) -> Gtk.Widget:
     """Create the sidebar with navigation list."""
     # Create a mapping of rows to widget names
-    widget_rows = {}
+    widget_rows: dict[str, Adw.ActionRow] = {}
 
     return build(
         Gtk.ScrolledWindow(
             hscrollbar_policy=Gtk.PolicyType.NEVER,
             vscrollbar_policy=Gtk.PolicyType.AUTOMATIC,
         ),
-        lambda scrolled: (
-            (lifecycle := WidgetLifecycle(scrolled)),
-            scrolled.set_child(
-                build(
-                    Gtk.ListBox(
-                        css_classes=["navigation-sidebar"],
-                        selection_mode=Gtk.SelectionMode.SINGLE,
+        lambda scrolled: scrolled.set_child(
+            build(
+                Gtk.ListBox(
+                    css_classes=["navigation-sidebar"],
+                    selection_mode=Gtk.SelectionMode.SINGLE,
+                ),
+                lambda listbox: do(
+                    # Add rows for each widget and track them
+                    apply(listbox.append).foreach(
+                        *(
+                            widget_rows.setdefault(name, Adw.ActionRow(title=name, activatable=True))
+                            for name in view_model.widget_names
+                        )
                     ),
-                    lambda listbox: do(
-                        # Add rows for each widget and track them
-                        apply(listbox.append).foreach(
-                            *(
-                                widget_rows.setdefault(
-                                    name, Adw.ActionRow(title=name, activatable=True)
-                                )
-                                for name in view_model.widget_names
+                    # Handle selection
+                    listbox.connect(
+                        "row-selected",
+                        lambda lb, row: do(
+                            widget_name := next(
+                                (name for name, r in widget_rows.items() if r == row),
+                                None,
                             )
+                            if row
+                            else None,
+                            view_model.select_widget(widget_name) if widget_name else None,
                         ),
-                        # Handle selection
-                        lifecycle.subscribe(listbox, "row-selected")(
-                            lambda *_: do(
-                                selected_row := listbox.get_selected_row(),
-                                widget_name := next(
-                                    (
-                                        name
-                                        for name, row in widget_rows.items()
-                                        if row == selected_row
-                                    ),
-                                    None,
-                                )
-                                if selected_row
-                                else None,
-                                view_model.select_widget(widget_name) if widget_name else None,
-                            ),
-                        ),
-                        # Set initial selection when selected widget changes
-                        lifecycle.watch(view_model.selected_widget, init=True)(
-                            lambda name: do(
-                                target_row := widget_rows.get(name) if name else None,
-                                listbox.select_row(target_row),
-                            )
-                        ),
+                    ),
+                    # Set initial selection and update when selected widget changes
+                    view_model.selected_widget.watch(
+                        lambda name: listbox.select_row(widget_rows.get(name)),
+                        init=True,
                     ),
                 ),
-            ),
+            )
         ),
     )
 
@@ -247,36 +223,33 @@ def PreviewArea(view_model: PreviewViewModel, event_loop: asyncio.AbstractEventL
             halign=Gtk.Align.CENTER,
             valign=Gtk.Align.CENTER,
         ),
-        lambda clamp: (
-            (lifecycle := WidgetLifecycle(clamp)),
-            clamp.set_child(
-                build(
-                    Gtk.Box(
-                        orientation=Gtk.Orientation.VERTICAL,
-                        spacing=12,
-                        margin_top=24,
-                        margin_bottom=24,
-                        margin_start=24,
-                        margin_end=24,
+        lambda clamp: clamp.set_child(
+            build(
+                Gtk.Box(
+                    orientation=Gtk.Orientation.VERTICAL,
+                    spacing=12,
+                    margin_top=24,
+                    margin_bottom=24,
+                    margin_start=24,
+                    margin_end=24,
+                ),
+                lambda preview_box: do(
+                    # Update preview when selected widget changes
+                    view_model.selected_widget.watch(
+                        lambda name: _update_preview_content(preview_box, name, view_model, event_loop),
+                        init=True,
                     ),
-                    lambda preview_box: do(
-                        # Update preview when selected widget or reload trigger changes
-                        lifecycle.watch(view_model.selected_widget, init=True)(
-                            lambda name: _update_preview_content(
-                                preview_box, name, view_model, event_loop
-                            ),
-                        ),
-                        lifecycle.watch(view_model.reload_trigger)(
-                            lambda _: _update_preview_content(
-                                preview_box,
-                                view_model.selected_widget.value,
-                                view_model,
-                                event_loop,
-                            ),
-                        ),
+                    # Update preview when reload trigger changes
+                    view_model.reload_trigger.watch(
+                        lambda _: _update_preview_content(
+                            preview_box,
+                            view_model.selected_widget.value,
+                            view_model,
+                            event_loop,
+                        )
                     ),
                 ),
-            ),
+            )
         ),
     )
 
@@ -308,25 +281,33 @@ def _update_preview_content(
 def MainContent(view_model: PreviewViewModel, event_loop: asyncio.AbstractEventLoop) -> Gtk.Widget:
     """Create the main content area with sidebar and preview."""
     return build(
-        Adw.OverlaySplitView(
-            min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25
-        ),
+        Adw.OverlaySplitView(min_sidebar_width=200, max_sidebar_width=300, sidebar_width_fraction=0.25),
         lambda split_view: do(
             # Bind sidebar visibility to state
-            view_model.show_sidebar.bind(split_view, "show_sidebar"),
+            view_model.show_sidebar.bind(split_view, "show-sidebar"),
             # Set sidebar and content
             split_view.set_sidebar(Sidebar(view_model)),
             split_view.set_content(
-                Conditional(
-                    view_model.selected_widget.map(bool),
-                    true=PreviewArea(view_model, event_loop),
-                    false=Gtk.Label(
-                        label="No widgets available",
-                        css_classes=["dim-label"],
-                        halign=Gtk.Align.CENTER,
-                        valign=Gtk.Align.CENTER,
+                build(
+                    Gtk.Stack(),
+                    lambda stack: do(
+                        stack.add_named(PreviewArea(view_model, event_loop), "preview"),
+                        stack.add_named(
+                            Gtk.Label(
+                                label="No widgets available",
+                                css_classes=["dim-label"],
+                                halign=Gtk.Align.CENTER,
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            "empty",
+                        ),
+                        # Update stack visibility based on selected widget
+                        view_model.selected_widget.watch(
+                            lambda name: stack.set_visible_child_name("preview" if name else "empty"),
+                            init=True,
+                        ),
                     ),
-                ),
+                )
             ),
         ),
     )
@@ -337,9 +318,7 @@ def PreviewWindow(
 ) -> Adw.ApplicationWindow:
     """Create the main application window."""
     return build(
-        Adw.ApplicationWindow(
-            application=app, default_width=1000, default_height=700, title="Preview Widgets"
-        ),
+        Adw.ApplicationWindow(application=app, default_width=1000, default_height=700, title="Preview Widgets"),
         lambda window: window.set_content(
             build(
                 Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.RAISED),

@@ -1,6 +1,6 @@
 import gi
 
-from reactivegtk import MutableState, WidgetLifecycle
+from reactivegtk import MutableState
 from reactivegtk.dsl import apply, build, do
 
 gi.require_versions(
@@ -23,7 +23,6 @@ def Counter() -> Gtk.Widget:
             halign=Gtk.Align.CENTER,
         ),
         lambda box: do(
-            lifecycle := WidgetLifecycle(box),
             apply(box.append).foreach(
                 build(
                     Gtk.Label(css_classes=["title-1"]),
@@ -40,11 +39,12 @@ def Counter() -> Gtk.Widget:
                         build(
                             Gtk.Button(
                                 icon_name="list-remove-symbolic",
-                                css_classes=["circular"],
+                                css_classes=["circular", "destructive-action"],
                                 valign=Gtk.Align.CENTER,
                             ),
-                            lambda button: lifecycle.subscribe(button, "clicked")(
-                                lambda *_: count.update(lambda x: x - 1)
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.update(lambda x: x - 1),
                             ),
                         ),
                         build(
@@ -53,8 +53,9 @@ def Counter() -> Gtk.Widget:
                                 css_classes=["circular", "destructive-action"],
                                 valign=Gtk.Align.CENTER,
                             ),
-                            lambda button: lifecycle.subscribe(button, "clicked")(
-                                lambda *_: count.set(0)
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.set(0),
                             ),
                         ),
                         build(
@@ -63,8 +64,9 @@ def Counter() -> Gtk.Widget:
                                 css_classes=["circular"],
                                 valign=Gtk.Align.CENTER,
                             ),
-                            lambda button: lifecycle.subscribe(button, "clicked")(
-                                lambda *_: count.update(lambda x: x + 1)
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.update(lambda x: x + 1),
                             ),
                         ),
                     ),
