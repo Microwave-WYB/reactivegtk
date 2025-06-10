@@ -1,5 +1,5 @@
 import weakref
-from typing import Any, Callable, Generic, Self, TypeVar, cast
+from typing import Any, Callable, Generic, TypeVar, cast
 
 import gi
 
