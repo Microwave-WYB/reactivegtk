@@ -1,4 +1,4 @@
-.PHONY: sync install format lint typecheck test check all clean help
+.PHONY: sync install fix lint typecheck test check all clean help
 
 # Variables
 UV := uv
@@ -12,13 +12,13 @@ FILE ?=
 help:
 	@echo "Available targets:"
 	@echo "  install    - Install dependencies with uv"
-	@echo "  format     - Format code with ruff"
+	@echo "  fix     - Format code with ruff"
 	@echo "  lint       - Lint code with ruff"
 	@echo "  typecheck  - Type check with pyright"
 	@echo "  doctest    - Run doctests (use FILE=path/to/file.py for specific file)"
 	@echo "  pytest     - Run pytest (not implemented yet)"
 	@echo "  test       - Run doctests and pytest"
-	@echo "  check      - Run format, lint, and typecheck"
+	@echo "  check      - Run fix, lint, and typecheck"
 	@echo "  all        - sync, check, and test"
 	@echo "  clean      - Clean up cache files"
 
@@ -29,13 +29,16 @@ sync:
 # Install dependencies (alias for sync)
 install: sync
 
-# Format code with ruff (includes import sorting)
-format:
+# Fix code with ruff (includes import sorting)
+fix:
 	$(UV) run ruff format $(SRC_DIR) $(DEMO_DIR)
 	$(UV) run ruff check --select I --fix $(PYTHON_FILES)
+	$(UV) run ruff check --fix $(SRC_DIR) $(DEMO_DIR)
 
 # Lint code with ruff
 lint:
+	$(UV) run ruff format --check $(SRC_DIR) $(DEMO_DIR)
+	$(UV) run ruff check --select I $(PYTHON_FILES)
 	$(UV) run ruff check $(SRC_DIR) $(DEMO_DIR)
 
 # Type checking with pyright
@@ -66,7 +69,7 @@ pytest:
 test: doctest pytest
 
 # Run all checks
-check: format lint typecheck
+check: fix lint typecheck
 
 # Complete workflow
 all: sync check test

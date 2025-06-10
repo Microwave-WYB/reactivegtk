@@ -1,28 +1,37 @@
 import asyncio
 from collections.abc import Awaitable, Callable
+from concurrent.futures import Future
 from typing import Generic, TypeVar
 
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
 T = TypeVar("T")
 
 
-class Effect(Generic[T]):
-    def __init__(self, func: Callable[[], Awaitable[T]], event_loop: asyncio.AbstractEventLoop):
+class Effect(Generic[P, T]):
+    def __init__(self, func: Callable[P, Awaitable[T]], event_loop: asyncio.AbstractEventLoop):
         self._func = func
-        self._task = None
+        self._task: Future[T] | None = None
         self._event_loop = event_loop
 
-    def cancel(self):
+    def cancel(self) -> bool:
         """Cancel the currently running task, if any."""
-        if self._task and not self._task.done():
-            self._task.cancel()
-        self._task = None
+        return self._task.cancel() if self._task else True
 
-    async def _run(self) -> T:
-        """Wrap the function call in an asyncio task."""
-        return await self._func()
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> Future[T]:
+        async def run_effect() -> T:
+            """Run the effect function in the event loop."""
+            return await self._func(*args, **kwargs)
 
-    def launch(self):
-        """Launch the side effect in the event loop."""
+        self.cancel()
+        self._task = asyncio.run_coroutine_threadsafe(run_effect(), self._event_loop)
+        return self._task
 
-        self.cancel()  # Cancel any existing task
-        self._task = asyncio.run_coroutine_threadsafe(self._run(), self._event_loop)
+
+def effect(
+    event_loop: asyncio.AbstractEventLoop,
+) -> Callable[[Callable[P, Awaitable[T]]], Effect[P, T]]:
+    """Create a launcher function that ignores arguments and launches the effect."""
+
+    return lambda func: Effect(func, event_loop)

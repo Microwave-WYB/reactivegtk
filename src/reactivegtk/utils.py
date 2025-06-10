@@ -31,7 +31,7 @@ def into(
     return decorator
 
 
-Ts = TypeVarTuple = TypeVarTuple("Ts")
+Ts = TypeVarTuple("Ts")
 
 
 def unpack_into(

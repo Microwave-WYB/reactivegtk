@@ -64,7 +64,7 @@ class Signal(Generic[T]):
     def cleanup(self):
         """Cleanup all connections and references."""
         # Disconnect all internal signal connections
-        for connection in list(self._connections):
+        for connection in self._connections:
             if connection.is_valid():
                 connection.disconnect()
         self._connections.clear()

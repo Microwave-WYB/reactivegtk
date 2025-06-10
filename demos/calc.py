@@ -1,8 +1,9 @@
-import gi
 from typing import Callable, Optional
 
-from reactivegtk import MutableState, Preview, WidgetLifecycle
-from reactivegtk.dsl import apply, do, ui, unpack_apply
+import gi
+
+from reactivegtk import MutableState, Preview
+from reactivegtk.dsl import apply, build, do, unpack_apply
 
 gi.require_versions(
     {
@@ -58,13 +59,7 @@ class CalculatorViewModel:
 
         current = self.current_expression.value
 
-        parts = (
-            current.replace("+", "|")
-            .replace("-", "|")
-            .replace("*", "|")
-            .replace("/", "|")
-            .split("|")
-        )
+        parts = current.replace("+", "|").replace("-", "|").replace("*", "|").replace("/", "|").split("|")
         if parts and "." not in parts[-1]:
             if not current or current[-1] in "+-*/":
                 self.current_expression.update(lambda expr: expr + "0.")
@@ -105,8 +100,8 @@ class CalculatorViewModel:
 
 def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
     return Gtk.WindowHandle(
-        child=ui(
-            box := Gtk.Box(
+        child=build(
+            Gtk.Box(
                 orientation=Gtk.Orientation.VERTICAL,
                 spacing=6,
                 margin_start=12,
@@ -114,31 +109,33 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
                 margin_top=12,
                 margin_bottom=6,
             ),
-            apply(box.append).foreach(
-                ui(
-                    expression_label := Gtk.Label(
+            lambda box: apply(box.append).foreach(
+                build(
+                    Gtk.Label(
                         label="",
                         halign=Gtk.Align.END,
                         ellipsize=Pango.EllipsizeMode.END,
                     ),
-                    view_model.current_expression.map(lambda expr: expr or "0").bind(
+                    lambda expression_label: view_model.current_expression.map(lambda expr: expr or "0").bind(
                         expression_label, "label"
                     ),
                 ),
-                ui(
-                    result_label := Gtk.Label(
+                build(
+                    Gtk.Label(
                         label="0",
                         halign=Gtk.Align.END,
                         css_classes=["title-1"],
                         ellipsize=Pango.EllipsizeMode.END,
                     ),
-                    view_model.result.bind(result_label, "label"),
-                    view_model.has_error.watch(
-                        lambda has_error: (
-                            result_label.add_css_class("error")
-                            if has_error
-                            else result_label.remove_css_class("error")
-                        )
+                    lambda result_label: do(
+                        view_model.result.bind(result_label, "label"),
+                        view_model.has_error.watch(
+                            lambda has_error: (
+                                result_label.add_css_class("error")
+                                if has_error
+                                else result_label.remove_css_class("error")
+                            )
+                        ),
                     ),
                 ),
             ),
@@ -153,23 +150,24 @@ def CalcButton(
     width_request: Optional[int] = None,
     icon: bool = False,
 ) -> Gtk.Button:
-    return ui(
-        button := Gtk.Button(
+    return build(
+        Gtk.Button(
             hexpand=True,
             vexpand=True,
             can_focus=False,
         ),
-        button.set_icon_name(label_or_icon) if icon else button.set_label(label_or_icon),
-        lifecycle := WidgetLifecycle(button),
-        do(*[button.add_css_class(css_class) for css_class in (css_classes or [])]),
-        button.set_size_request(width_request or -1, -1) if width_request else None,
-        lifecycle.subscribe(button, "clicked")(lambda *_: on_click()),
+        lambda button: do(
+            button.set_icon_name(label_or_icon) if icon else button.set_label(label_or_icon),
+            *[button.add_css_class(css_class) for css_class in (css_classes or [])],
+            button.set_size_request(width_request or -1, -1) if width_request else None,
+            button.connect("clicked", lambda *_: on_click()),
+        ),
     )
 
 
 def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
-    return ui(
-        grid := Gtk.Grid(
+    return build(
+        Gtk.Grid(
             row_spacing=6,
             column_spacing=6,
             margin_top=12,
@@ -179,7 +177,7 @@ def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
             hexpand=True,
             vexpand=True,
         ),
-        unpack_apply(grid.attach).foreach(
+        lambda grid: unpack_apply(grid.attach).foreach(
             # Row 0: Clear and backspace
             (CalcButton("C", view_model.clear, ["destructive-action"]), 0, 0, 3, 1),
             (
@@ -239,12 +237,12 @@ def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
 
 
 def CalculatorView(view_model: CalculatorViewModel) -> Gtk.Box:
-    return ui(
-        box := Gtk.Box(
+    return build(
+        Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
             spacing=0,
         ),
-        apply(box.append).foreach(
+        lambda box: apply(box.append).foreach(
             ResultsDisplay(view_model),
             Gtk.Separator(),
             Keypad(view_model),
@@ -302,30 +300,36 @@ def CalculatorWindow() -> Adw.Window:
             case _:
                 return False
 
-    return ui(
-        window := Adw.Window(
+    return build(
+        Adw.Window(
             title="Calculator",
             default_height=400,
             default_width=300,
             resizable=True,
             can_focus=True,
         ),
-        lifecycle := WidgetLifecycle(window),
-        window.add_controller(
-            do(
-                key_controller := Gtk.EventControllerKey(
-                    name="key-controller",
-                    propagation_phase=Gtk.PropagationPhase.CAPTURE,
+        lambda window: do(
+            window.add_controller(
+                do(
+                    key_controller := Gtk.EventControllerKey(
+                        name="key-controller",
+                        propagation_phase=Gtk.PropagationPhase.CAPTURE,
+                    ),
+                    key_controller.connect(
+                        "key-pressed",
+                        handle_key_press,
+                    ),
+                    ret=key_controller,
+                )
+            ),
+            window.set_content(
+                build(
+                    Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT),
+                    lambda toolbar_view: do(
+                        toolbar_view.add_top_bar(Adw.HeaderBar()),
+                        toolbar_view.set_content(CalculatorView(view_model)),
+                    ),
                 ),
-                lifecycle.subscribe(key_controller, "key-pressed")(handle_key_press),
-                ret=key_controller,
-            )
-        ),
-        window.set_content(
-            ui(
-                toolbar_view := Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT),
-                toolbar_view.add_top_bar(Adw.HeaderBar()),
-                toolbar_view.set_content(CalculatorView(view_model)),
             ),
         ),
     )

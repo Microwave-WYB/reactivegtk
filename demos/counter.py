@@ -1,7 +1,7 @@
 import gi
 
-from reactivegtk import MutableState, WidgetLifecycle
-from reactivegtk.dsl import apply, ui
+from reactivegtk import MutableState
+from reactivegtk.dsl import apply, build, do
 
 gi.require_versions(
     {
@@ -15,53 +15,59 @@ from gi.repository import Adw, Gtk  # type: ignore # noqa: E402
 def Counter() -> Gtk.Widget:
     count = MutableState(0)
 
-    return ui(
-        box := Gtk.Box(
+    return build(
+        Gtk.Box(
             orientation=Gtk.Orientation.VERTICAL,
             spacing=6,
             valign=Gtk.Align.CENTER,
             halign=Gtk.Align.CENTER,
         ),
-        lifecycle := WidgetLifecycle(box),
-        apply(box.append).foreach(
-            ui(
-                label := Gtk.Label(css_classes=["title-1"]),
-                count.map(str).bind(label, "label"),
-            ),
-            ui(
-                hbox := Gtk.Box(
-                    orientation=Gtk.Orientation.HORIZONTAL,
-                    spacing=12,
-                    halign=Gtk.Align.CENTER,
-                    valign=Gtk.Align.CENTER,
+        lambda box: do(
+            apply(box.append).foreach(
+                build(
+                    Gtk.Label(css_classes=["title-1"]),
+                    lambda label: count.map(str).bind(label, "label"),
                 ),
-                apply(hbox.append).foreach(
-                    ui(
-                        button := Gtk.Button(
-                            icon_name="list-remove-symbolic",
-                            css_classes=["circular"],
-                            valign=Gtk.Align.CENTER,
-                        ),
-                        lifecycle.subscribe(button, "clicked")(
-                            lambda *_: count.update(lambda x: x - 1)
-                        ),
+                build(
+                    Gtk.Box(
+                        orientation=Gtk.Orientation.HORIZONTAL,
+                        spacing=12,
+                        halign=Gtk.Align.CENTER,
+                        valign=Gtk.Align.CENTER,
                     ),
-                    ui(
-                        button := Gtk.Button(
-                            icon_name="view-refresh-symbolic",
-                            css_classes=["circular", "destructive-action"],
-                            valign=Gtk.Align.CENTER,
+                    lambda hbox: apply(hbox.append).foreach(
+                        build(
+                            Gtk.Button(
+                                icon_name="list-remove-symbolic",
+                                css_classes=["circular", "destructive-action"],
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.update(lambda x: x - 1),
+                            ),
                         ),
-                        lifecycle.subscribe(button, "clicked")(lambda *_: count.set(0)),
-                    ),
-                    ui(
-                        button := Gtk.Button(
-                            icon_name="list-add-symbolic",
-                            css_classes=["circular"],
-                            valign=Gtk.Align.CENTER,
+                        build(
+                            Gtk.Button(
+                                icon_name="view-refresh-symbolic",
+                                css_classes=["circular", "destructive-action"],
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.set(0),
+                            ),
                         ),
-                        lifecycle.subscribe(button, "clicked")(
-                            lambda *_: count.update(lambda x: x + 1)
+                        build(
+                            Gtk.Button(
+                                icon_name="list-add-symbolic",
+                                css_classes=["circular"],
+                                valign=Gtk.Align.CENTER,
+                            ),
+                            lambda button: button.connect(
+                                "clicked",
+                                lambda *_: count.update(lambda x: x + 1),
+                            ),
                         ),
                     ),
                 ),
@@ -71,38 +77,44 @@ def Counter() -> Gtk.Widget:
 
 
 def Window(app: Adw.Application) -> Adw.ApplicationWindow:
-    return ui(
-        window := Adw.ApplicationWindow(application=app, title="Counter App"),
-        window.set_content(
-            ui(
-                view := Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT),
-                view.add_top_bar(
-                    Adw.HeaderBar(
-                        title_widget=Adw.WindowTitle(title="Counter App"),
-                        show_start_title_buttons=False,
-                    ),
-                ),
-                view.set_content(
-                    Gtk.WindowHandle(
-                        child=Counter(),
+    return build(
+        Adw.ApplicationWindow(application=app, title="Counter App"),
+        lambda window: do(
+            window.set_content(
+                build(
+                    Adw.ToolbarView(top_bar_style=Adw.ToolbarStyle.FLAT),
+                    lambda view: do(
+                        view.add_top_bar(
+                            Adw.HeaderBar(
+                                title_widget=Adw.WindowTitle(title="Counter App"),
+                                show_start_title_buttons=False,
+                            ),
+                        ),
+                        view.set_content(
+                            Gtk.WindowHandle(
+                                child=Counter(),
+                            ),
+                        ),
                     ),
                 ),
             ),
+            window.set_default_size(300, 400),
         ),
-        window.set_default_size(300, 400),
     )
 
 
 def App() -> Adw.Application:
-    app = Adw.Application(application_id="com.example.CounterApp")
-
-    @lambda f: app.connect("activate", f)
-    def _(*_):
-        window = Window(app)
-        window.set_application(app)
-        window.present()
-
-    return app
+    return build(
+        Adw.Application(application_id="com.example.CounterApp"),
+        lambda app: app.connect(
+            "activate",
+            lambda *_: do(
+                window := Window(app),
+                window.set_application(app),
+                window.present(),
+            ),
+        ),
+    )
 
 
 App().run([])
