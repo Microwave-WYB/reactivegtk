@@ -29,7 +29,7 @@ def HelloWorld():
         )
 
         label = Gtk.Label(css_classes=["title-1"])
-        name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label")
+        name.map(lambda x: f"Hello, {x or '...'}!").bind(label, "label")
 
         return (entry, label)
 
