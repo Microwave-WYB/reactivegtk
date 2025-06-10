@@ -5,6 +5,7 @@ from typing import Callable, Final, Literal, Optional
 import gi
 
 from reactivegtk import MutableState, Preview, apply, State
+from reactivegtk.dsl import attempt
 
 gi.require_versions(
     {
@@ -45,12 +46,14 @@ class CalculatorState:
     result: str = "0"
     error: bool = False
 
+    @property
+    def last_char(self) -> str:
+        return self.current_expression[-1]
+
     def sync_result(self) -> "CalculatorState":
-        try:
-            result = eval(self.current_expression)
-            return replace(self, result=str(result), error=False)
-        except Exception:
-            return self
+        return attempt(
+            lambda: replace(self, result=str(eval(self.current_expression)), error=False),
+        ).orelse(self)
 
     def update(self, action: CalculatorAction) -> "CalculatorState":
         match action:
@@ -63,21 +66,25 @@ class CalculatorState:
                 return replace(self, current_expression=new_expression).sync_result()
 
             case Operator(symbol):
-                match symbol:
-                    case "-":
-                        if self.current_expression == "0":
-                            return replace(self, current_expression="-")
-                        return replace(self, current_expression=self.current_expression + symbol)
-                    case _:
-                        return replace(self, current_expression=self.current_expression + symbol)
+                if self.last_char in "+-*/":
+                    return replace(
+                        self,
+                        current_expression=self.current_expression[:-1] + symbol,
+                    ).sync_result()
+                return replace(
+                    self,
+                    current_expression=self.current_expression + symbol,
+                ).sync_result()
 
             case Control.CLEAR:
                 return CalculatorState()
 
             case Control.BACKSPACE:
+                if len(self.current_expression) == 1:
+                    return CalculatorState()
                 return replace(
                     self,
-                    current_expression=self.current_expression[:-1] if self.current_expression else "",
+                    current_expression=self.current_expression[:-1],
                 ).sync_result()
 
             case Control.DECIMAL:
