@@ -130,7 +130,7 @@ class HelloWorldWidget(Gtk.Box):
         self.append(self.label)
 
         # Set up reactive bindings
-        self.name.twoway_bind(self.entry, "text")
+        self.name.bind_twoway(self.entry, "text")
         self.name.map(lambda x: f"Hello, {x or '...'}!").bind(self.label, "label")
 
     def _on_entry_activate(self, entry: Gtk.Entry) -> None:
@@ -191,7 +191,7 @@ def HelloWorld():
     @apply(box.append)
     def _():
         entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
-        name.twoway_bind(entry, "text")
+        name.bind_twoway(entry, "text")
 
         @partial(entry.connect, "activate")
         def _(*_):
@@ -261,7 +261,7 @@ def _(new_value):
 ```
 
 **When to use MutableState vs State:**
-- Use `MutableState` when you need to modify the state (`.set()`, `.update()`, `.twoway_bind()`)
+- Use `MutableState` when you need to modify the state (`.set()`, `.update()`, `.bind_twoway()`)
 - Use `State` for read-only derived state or when exposing state in component APIs
 - `State` is the base class - you can pass `MutableState` wherever `State` is expected
 
@@ -278,7 +278,7 @@ name.map(lambda x: f"Hello, {x or '...'}!").bind(label, "label")
 # Two-way binding: state ↔ widget (only works with MutableState)
 text_state = MutableState("")
 entry = Gtk.Entry()
-text_state.twoway_bind(entry, "text")
+text_state.bind_twoway(entry, "text")
 
 # Now when you type in the entry, text_state automatically updates
 # And when you call text_state.set("new value"), the entry updates too
@@ -292,7 +292,7 @@ def _(new_text):
 text_state.map(str.upper).bind(label, "label")  # Always uppercase
 ```
 
-**Note**: Two-way binding (`.twoway_bind()`) only works with `MutableState`, not `State`. This prevents accidental modifications of read-only derived state.
+**Note**: Two-way binding (`.bind_twoway()`) only works with `MutableState`, not `State`. This prevents accidental modifications of read-only derived state.
 
 ### 3. Effects
 
@@ -526,7 +526,7 @@ The preview application creates a navigatable window with your components displa
 - `state.update(fn)`: Update value with function (MutableState only)
 - `state.map(fn)`: Create derived state that transforms the value
 - `state.bind(widget, prop)`: One-way binding to widget property
-- `state.twoway_bind(widget, prop)`: Two-way binding (MutableState only)
+- `state.bind_twoway(widget, prop)`: Two-way binding (MutableState only)
 - `@state.watch`: Watch for state changes (decorator pattern)
 
 ### DSL Functions

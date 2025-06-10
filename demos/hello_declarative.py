@@ -22,7 +22,7 @@ def HelloWorld():
     @apply(box.append)
     def _():
         entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
-        name.twoway_bind(entry, "text")
+        name.bind_twoway(entry, "text")
         entry.connect(
             "activate",
             lambda: print(f"Entry activated with text: {name.value}"),

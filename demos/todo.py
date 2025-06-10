@@ -34,7 +34,7 @@ class TaskViewModel:
 
     def bind_done_twoway(self, obj: GObject.Object, property_name: str) -> GObject.Binding:
         """Bind done state to a GObject property with two-way binding"""
-        return self._done.twoway_bind(obj, property_name)
+        return self._done.bind_twoway(obj, property_name)
 
 
 def TaskWidget(task: TaskViewModel, on_remove: Callable[[TaskViewModel], None]) -> Adw.ActionRow:
@@ -97,6 +97,7 @@ class TodoViewModel:
         self._tasks = MutableState[Sequence[TaskViewModel]]([])
         self._entry_text = MutableState("")
         self._stats = MutableState[tuple[int, int]]((0, 0))
+
         @self._tasks.watch
         def _(_):
             self.update_stats()
@@ -111,7 +112,7 @@ class TodoViewModel:
 
     def bind_entry_text_twoway(self, obj: GObject.Object, property_name: str) -> None:
         """Bind entry text to a GObject property with two-way binding"""
-        self._entry_text.twoway_bind(obj, property_name)
+        self._entry_text.bind_twoway(obj, property_name)
 
     @property
     def stats(self) -> State[tuple[int, int]]:
@@ -127,6 +128,7 @@ class TodoViewModel:
         if not text:
             return None
         new_task = TaskViewModel(text)
+
         @new_task._done.watch
         def _(_):
             self.update_stats()

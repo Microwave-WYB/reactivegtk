@@ -1,5 +1,5 @@
 import weakref
-from typing import Any, Callable, Generic, TypeVar, cast
+from typing import Any, Callable, Generic, Self, TypeVar, cast
 
 import gi
 
@@ -160,7 +160,7 @@ class MutableState(State[T]):
         """Update the state value using a function."""
         self.set(fn(self.value))
 
-    def twoway_bind(
+    def bind_twoway(
         self,
         target_object: GObject.Object,
         target_property: str,
