@@ -398,7 +398,7 @@ def _():
 
 #### `@apply.unpack(function)` - Single Tuple Unpacking
 
-For unpacking a single tuple as function arguments:
+For unpacking a single tuple as function arguments. **Note: `unpack` only works with positional arguments, not keyword arguments.**
 
 ```python
 # Attach a single widget to a grid with position data
@@ -410,11 +410,16 @@ def _():
     return (button, 0, 0, 2, 1)  # widget, column, row, width, height
 
 # This is equivalent to: grid.attach(button, 0, 0, 2, 1)
+
+# ❌ This would NOT work - unpack can't handle keyword arguments:
+# @apply.unpack(some_function)
+# def _():
+#     return (widget, column=0, row=0)  # Error! Keywords not supported
 ```
 
 #### `@apply.unpack(function).foreach` - Multiple Tuple Arguments
 
-Perfect for grid layouts where you need to unpack multiple tuples:
+Perfect for grid layouts where you need to unpack multiple tuples. **Note: `unpack` only works with positional arguments, not keyword arguments.**
 
 ```python
 # Attach multiple widgets to a grid with position and span data
@@ -435,6 +440,14 @@ def _():
 # grid.attach(Gtk.Button(label="Clear"), 0, 0, 3, 1)
 # grid.attach(Gtk.Button(label="7"), 0, 1, 1, 1)
 # etc.
+
+# ❌ This would NOT work - unpack can't handle keyword arguments:
+# @apply.unpack(grid.attach).foreach
+# def _():
+#     return (
+#         (widget1, column=0, row=0),  # Error! Keywords not supported
+#         (widget2, column=1, row=0),  # Error! Keywords not supported
+#     )
 ```
 
 #### Signal Connections with `@partial`
