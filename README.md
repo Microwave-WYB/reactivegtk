@@ -21,7 +21,7 @@ ReactiveGTK provides patterns and utilities around GTK4/PyGObject to make buildi
 ## Installation
 
 ```bash
-pip install reactive-gtk
+pip install https://github.com/Microwave-WYB/reactivegtk.git
 ```
 
 ## Why ReactiveGTK?
