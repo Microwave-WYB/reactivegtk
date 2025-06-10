@@ -82,6 +82,7 @@ def bind_sequence(
             state["widget_by_key"][key_fn(item)] = widget
             return widget
 
+        @items.watch
         def sync_items(new_items: Sequence[ItemT]):
             """Sync container using efficient diff algorithm."""
 
@@ -97,8 +98,6 @@ def bind_sequence(
             )
 
             state["current_items"] = new_items
-
-        items.watch(sync_items, init=True)
 
     return decorator
 

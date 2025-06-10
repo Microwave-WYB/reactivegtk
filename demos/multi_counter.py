@@ -29,14 +29,13 @@ def CounterWidget(
     event_loop: asyncio.AbstractEventLoop,
     on_remove: Callable[[CounterModel], None],
 ) -> Gtk.Widget:
+    @model.auto_increment.watch
     @effect(event_loop)
     async def auto_increment_effect(enabled: bool):
         """Auto-increment effect that runs while auto is enabled"""
         while enabled:
             await asyncio.sleep(1)
             model.count.update(lambda x: x + 1)
-
-    model.auto_increment.watch(auto_increment_effect, init=True)
 
     vbox = Gtk.Box(
         orientation=Gtk.Orientation.VERTICAL,

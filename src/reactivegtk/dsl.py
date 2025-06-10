@@ -3,11 +3,11 @@ from typing import Any, Generic, TypeVar
 
 from typing_extensions import TypeVarTuple, Unpack
 
-InnerT = TypeVar("InnerT")
+T = TypeVar("T")
 Ts = TypeVarTuple("Ts")
 
 
-class apply(Generic[InnerT]):
+class apply(Generic[T]):
     class unpack(Generic[Unpack[Ts]]):
         def __init__(self, outer_fn: Callable[[Unpack[Ts]], Any]) -> None:
             self.outer_fn = outer_fn
@@ -51,10 +51,10 @@ class apply(Generic[InnerT]):
                 self.outer_fn(*item)
             return lambda: result
 
-    def __init__(self, outer_fn: Callable[[InnerT], Any]) -> None:
+    def __init__(self, outer_fn: Callable[[T], Any]) -> None:
         self.outer_fn = outer_fn
 
-    def __call__(self, inner_fn: Callable[[], InnerT]) -> Callable[[], InnerT]:
+    def __call__(self, inner_fn: Callable[[], T]) -> Callable[[], T]:
         """
         Call a function immediately with the result of decorated function.
 
@@ -69,7 +69,7 @@ class apply(Generic[InnerT]):
         self.outer_fn(result)
         return lambda: result
 
-    def foreach(self, inner_fn: Callable[[], Iterable[InnerT]]) -> Callable[[], Iterable[InnerT]]:
+    def foreach(self, inner_fn: Callable[[], Iterable[T]]) -> Callable[[], Iterable[T]]:
         """
         Transform a decorator to work on each item in an iterable.
 

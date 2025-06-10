@@ -214,10 +214,9 @@ def Sidebar(view_model: PreviewViewModel) -> Gtk.Widget:
                     view_model.select_widget(widget_name)
 
         # Set initial selection and update when selected widget changes
-        view_model.selected_widget.watch(
-            lambda name: listbox.select_row(widget_rows.get(name)),
-            init=True,
-        )
+        @view_model.selected_widget.watch
+        def _(name: str):
+            listbox.select_row(widget_rows.get(name))
 
         return listbox
 
@@ -246,8 +245,12 @@ def PreviewArea(view_model: PreviewViewModel, event_loop: asyncio.AbstractEventL
 
         # Update preview when selected widget changes
         view_model.selected_widget.watch(
-            lambda name: _update_preview_content(preview_box, name, view_model, event_loop),
-            init=True,
+            lambda name: _update_preview_content(
+                preview_box,
+                name,
+                view_model,
+                event_loop,
+            ),
         )
 
         # Update preview when reload trigger changes
@@ -318,7 +321,6 @@ def MainContent(view_model: PreviewViewModel, event_loop: asyncio.AbstractEventL
         # Update stack visibility based on selected widget
         view_model.selected_widget.watch(
             lambda name: stack.set_visible_child_name("preview" if name else "empty"),
-            init=True,
         )
 
         return stack

@@ -105,18 +105,22 @@ class State(Generic[T]):
 
     def watch(
         self,
-        callback: Callable[[T], Any],
-        init: bool = False,
-    ) -> "Connection":
-        """Subscribe to changes in this state."""
-        if init:
-            # Call the callback immediately with the current value
-            callback(self.value)
+        callback: Callable[[T], R],
+    ) -> Callable[[T], R]:
+        """Subscribe to changes in this state, ignoring the connection ID."""
+        self.connect(callback)
+        return callback
 
+    def connect(
+        self,
+        callback: Callable[[T], Any],
+    ) -> int:
+        """Connect a callback to changes in this state."""
+        callback(self.value)
         connection_id = self._gobject.connect("notify::value", lambda *_: callback(self.value))
         connection = Connection(self._gobject, connection_id)
         self._connections.add(connection)
-        return connection
+        return connection_id
 
     def disconnect(self, connection_id: int) -> None:
         """Disconnect a signal connection."""
