@@ -130,11 +130,12 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
                 ellipsize=Pango.EllipsizeMode.END,
             )
             view_model.result.bind(result_label, "label")
-            view_model.has_error.watch(
-                lambda has_error: (
-                    result_label.add_css_class("error") if has_error else result_label.remove_css_class("error")
-                )
-            )
+            @view_model.has_error.watch
+            def _(has_error):
+                if has_error:
+                    result_label.add_css_class("error")
+                else:
+                    result_label.remove_css_class("error")
             return result_label
 
         return box

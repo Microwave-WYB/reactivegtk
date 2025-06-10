@@ -255,7 +255,9 @@ doubled = count.map(lambda x: x * 2)
 text = count.map(lambda x: f"Value: {x}")
 
 # Watch state changes
-count.watch(lambda new_value: print(f"Count changed to: {new_value}"))
+@count.watch
+def _(new_value):
+    print(f"Count changed to: {new_value}")
 ```
 
 **When to use MutableState vs State:**
@@ -282,7 +284,9 @@ text_state.twoway_bind(entry, "text")
 # And when you call text_state.set("new value"), the entry updates too
 
 # Watch state changes
-text_state.watch(lambda new_text: print(f"Text changed to: {new_text}"))
+@text_state.watch
+def _(new_text):
+    print(f"Text changed to: {new_text}")
 
 # Transform state before binding
 text_state.map(str.upper).bind(label, "label")  # Always uppercase
@@ -314,7 +318,9 @@ def AutoIncrementingCounter():
             count.update(lambda x: x + 1)
     
     # Watch state changes and pass value to effect
-    auto_enabled.watch(auto_increment_effect, init=True)
+    @auto_enabled.watch
+    def _(enabled):
+        auto_increment_effect(enabled)
     
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
     
@@ -521,7 +527,7 @@ The preview application creates a navigatable window with your components displa
 - `state.map(fn)`: Create derived state that transforms the value
 - `state.bind(widget, prop)`: One-way binding to widget property
 - `state.twoway_bind(widget, prop)`: Two-way binding (MutableState only)
-- `state.watch(callback)`: Watch for state changes
+- `@state.watch`: Watch for state changes (decorator pattern)
 
 ### DSL Functions
 

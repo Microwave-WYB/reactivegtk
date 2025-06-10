@@ -97,7 +97,9 @@ class TodoViewModel:
         self._tasks = MutableState[Sequence[TaskViewModel]]([])
         self._entry_text = MutableState("")
         self._stats = MutableState[tuple[int, int]]((0, 0))
-        self._tasks.watch(lambda _: self.update_stats())
+        @self._tasks.watch
+        def _(_):
+            self.update_stats()
 
     @property
     def tasks(self) -> State[Sequence[TaskViewModel]]:
@@ -125,7 +127,9 @@ class TodoViewModel:
         if not text:
             return None
         new_task = TaskViewModel(text)
-        new_task._done.watch(lambda _: self.update_stats())
+        @new_task._done.watch
+        def _(_):
+            self.update_stats()
 
         self._tasks.update(lambda ts: [*ts, new_task])
         self._entry_text.set("")
