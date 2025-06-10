@@ -15,7 +15,7 @@ ReactiveGTK provides patterns and utilities around GTK4/PyGObject to make buildi
 - 🔗 **Data Binding Helpers**: Utilities to keep GTK widgets and state in sync effortlessly
 - 📝 **Declarative DSL**: Functional patterns for building GTK UIs with clean syntax
 - 🔌 **Type Safety**: Full type hints support for better development experience
-- 🎯 **Minimal Dependencies**: Built on top of GTK4 and PyGObject
+- 🎯 **Minimal Dependencies**: Built on top of GTK4, libadwaita, and PyGObject
 - 🔍 **Preview System**: Development utilities for rapid component iteration
 
 ## Installation
@@ -304,57 +304,45 @@ Handle side effects and asynchronous operations with the `@effect` decorator:
 ```python
 import asyncio
 from reactivegtk import effect, start_event_loop
+from reactivegtk.dsl import build, do, apply
 
 # Start the async event loop (call once in your app)
 event_loop, thread = start_event_loop()
 
-count = MutableState(0)
-
-# Simple effect that runs when count changes
-@count.watch
-def on_count_change(new_value):
-    print(f"Count is now: {new_value}")
-
-# Async effect for heavy operations
-@effect(event_loop)
-async def auto_increment():
-    while True:
-        await asyncio.sleep(1)
-        count.update(lambda x: x + 1)
-
-# Effect that depends on state
-@effect(event_loop)
-async def save_to_file():
-    while True:
-        await asyncio.sleep(5)  # Save every 5 seconds
-        with open("count.txt", "w") as f:
-            f.write(str(count.value))
-```
-
-### 4. Declarative DSL
-
-ReactiveGTK provides a functional DSL for building UIs:
-
-```python
-from reactivegtk.dsl import build, do, apply
-
-def MyComponent():
+def AutoIncrementingCounter():
     count = MutableState(0)
-
+    auto_enabled = MutableState(False)
+    
+    # Auto-increment effect
+    @effect(event_loop)
+    async def auto_increment_effect(enabled: bool):
+        while enabled:
+            await asyncio.sleep(1)
+            count.update(lambda x: x + 1)
+    
+    # Watch state changes and pass value to effect
+    auto_enabled.watch(auto_increment_effect, init=True)
+    
     return build(
         Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12),
-        lambda box: do(
-            # Add multiple children at once
-            apply(box.append).foreach(
-                build(
-                    Gtk.Label(),
-                    lambda label: count.map(lambda x: f"Count: {x}").bind(label, "label")
-                ),
-                build(
-                    Gtk.Button(label="Increment"),
-                    lambda button: button.connect(
-                        "clicked",
-                        lambda *_: count.update(lambda x: x + 1)
+        lambda box: apply(box.append).foreach(
+            build(
+                Gtk.Label(css_classes=["title-1"]),
+                lambda label: count.map(lambda x: f"Count: {x}").bind(label, "label")
+            ),
+            build(
+                Gtk.Button(label="Reset"),
+                lambda button: button.connect("clicked", lambda *_: count.set(0))
+            ),
+            build(
+                Gtk.Button(),
+                lambda button: do(
+                    auto_enabled.map(
+                        lambda enabled: "Stop Auto-increment" if enabled else "Start Auto-increment"
+                    ).bind(button, "label"),
+                    button.connect(
+                        "clicked", 
+                        lambda *_: auto_enabled.update(lambda x: not x)
                     )
                 )
             )
@@ -362,14 +350,111 @@ def MyComponent():
     )
 ```
 
-**DSL Functions:**
-- `build(widget, setup_func)` - Create and configure a widget
-- `do(*actions)` - Execute multiple actions in sequence
-- `apply(func).foreach(*items)` - Apply a function to multiple items
+### 4. Declarative DSL
+
+ReactiveGTK provides a functional DSL for building UIs. Here's how each component works:
+
+#### `build(target, action)`
+
+Creates and configures widgets by applying actions to them:
+
+```python
+from reactivegtk.dsl import build
+
+# Simple example - create and configure a widget
+button = build(
+    Gtk.Button(label="Click me"),
+    lambda btn: btn.connect("clicked", lambda *_: print("Clicked!"))
+)
+
+# Returns the configured button widget
+```
+
+#### `do(*actions)`
+
+Executes multiple actions in sequence, useful for side effects:
+
+```python
+from reactivegtk.dsl import do
+
+# Execute multiple actions
+do(
+    print("Setting up widget"),
+    name.twoway_bind(entry, "text"),
+    entry.connect("activate", lambda *_: print("Activated"))
+)
+
+# Can also return a value
+result = do(
+    print("Computing..."),
+    ret=42  # Returns 42
+)
+```
+
+#### `apply(function).foreach(*items)`
+
+Applies a function to multiple items, perfect for adding multiple children:
+
+```python
+from reactivegtk.dsl import apply
+
+# Add multiple widgets to a container
+apply(box.append).foreach(
+    Gtk.Label(label="First"),
+    Gtk.Label(label="Second"), 
+    Gtk.Button(label="Third")
+)
+
+# Works with any function - equivalent to:
+# box.append(Gtk.Label(label="First"))
+# box.append(Gtk.Label(label="Second"))
+# box.append(Gtk.Button(label="Third"))
+```
+
+#### `attempt(function)`
+
+Handles potential errors gracefully:
+
+```python
+from reactivegtk.dsl import attempt
+
+# Try an operation that might fail
+result = attempt(lambda: risky_operation()).orelse("fallback")
+
+# Or handle specific exceptions
+result = attempt(lambda: int("not_a_number")).catch(lambda e: 0)
+```
+
+#### `unpack_apply(function).foreach(*tuples)`
+
+Like `apply`, but unpacks tuples as arguments. Perfect for grid layouts:
+
+```python
+from reactivegtk.dsl import unpack_apply
+
+# Attach multiple widgets to a grid with position and span data
+# Each tuple contains: (widget, column, row, width, height)
+grid = Gtk.Grid()
+
+unpack_apply(grid.attach).foreach(
+    (Gtk.Button(label="Clear"), 0, 0, 3, 1),  # spans 3 columns
+    (Gtk.Button(label="7"), 0, 1, 1, 1),
+    (Gtk.Button(label="8"), 1, 1, 1, 1), 
+    (Gtk.Button(label="9"), 2, 1, 1, 1),
+    (Gtk.Button(label="÷"), 3, 1, 1, 1),
+    # ... more buttons
+)
+
+# This is equivalent to:
+# grid.attach(Gtk.Button(label="Clear"), 0, 0, 3, 1)
+# grid.attach(Gtk.Button(label="7"), 0, 1, 1, 1)
+# grid.attach(Gtk.Button(label="8"), 1, 1, 1, 1)
+# etc.
+```
 
 ### 5. Preview System
 
-ReactiveGTK includes a preview system for rapid development:
+ReactiveGTK includes a preview application for rapid development:
 
 ```python
 from reactivegtk import Preview
@@ -393,64 +478,13 @@ if __name__ == "__main__":
     preview.run()  # Start preview server
 ```
 
-Run the preview server:
+Run the preview application:
 
 ```bash
 python demos/hello.py
 ```
 
-The preview system allows you to quickly test and iterate on your components during development.
-
-## Advanced Example: Counter with Auto-increment
-
-A more complex example showing async effects:
-
-```python
-import asyncio
-from reactivegtk import MutableState, effect, start_event_loop
-from reactivegtk.dsl import build, do, apply
-
-def Counter():
-    event_loop, _ = start_event_loop()
-    count = MutableState(0)
-    auto_enabled = MutableState(False)
-
-    # Auto-increment effect
-    @effect(event_loop)
-    async def auto_increment():
-        while auto_enabled.value:
-            await asyncio.sleep(1)
-            count.update(lambda x: x + 1)
-
-    # Restart effect when auto_enabled changes
-    auto_enabled.watch(lambda _: auto_increment())
-
-    return build(
-        Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12),
-        lambda box: apply(box.append).foreach(
-            build(
-                Gtk.Label(css_classes=["title-1"]),
-                lambda label: count.map(lambda x: f"Count: {x}").bind(label, "label")
-            ),
-            build(
-                Gtk.Button(),
-                lambda button: do(
-                    auto_enabled.map(
-                        lambda enabled: "Stop" if enabled else "Start Auto"
-                    ).bind(button, "label"),
-                    button.connect(
-                        "clicked",
-                        lambda *_: auto_enabled.update(lambda x: not x)
-                    )
-                )
-            ),
-            build(
-                Gtk.Button(label="Reset"),
-                lambda button: button.connect("clicked", lambda *_: count.set(0))
-            )
-        )
-    )
-```
+The preview application creates a navigatable window with your components displayed in different tabs, allowing you to quickly test and iterate on your components during development.
 
 ## API Reference
 
@@ -484,7 +518,7 @@ def Counter():
 
 - `Preview()`: Create preview server
 - `@preview` or `@preview(name)`: Register component for preview (uses function name if no name provided)
-- `preview.run()`: Start preview server
+- `preview.run()`: Start preview application
 
 ## Examples
 
@@ -501,7 +535,8 @@ Check out the `demos` directory for complete examples:
 ## Requirements
 
 - Python 3.10+
-- GTK 4.0
+- GTK4
+- libadwaita
 - PyGObject
 
 ## License

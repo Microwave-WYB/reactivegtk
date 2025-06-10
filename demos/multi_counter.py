@@ -30,11 +30,13 @@ def CounterWidget(
     on_remove: Callable[[CounterModel], None],
 ) -> Gtk.Widget:
     @effect(event_loop)
-    async def auto_increment_effect():
+    async def auto_increment_effect(enabled: bool):
         """Auto-increment effect that runs while auto is enabled"""
-        while model.auto_increment.value:
+        while enabled:
             await asyncio.sleep(1)
             model.count.update(lambda x: x + 1)
+
+    model.auto_increment.watch(auto_increment_effect, init=True)
 
     return build(
         Gtk.Box(
@@ -44,66 +46,33 @@ def CounterWidget(
             halign=Gtk.Align.CENTER,
         ),
         lambda vbox: do(
-            model.auto_increment.watch(
-                lambda _: auto_increment_effect(),
-                init=True,
-            ),
             vbox.connect("destroy", lambda *_: print("Counter widget destroyed")),
             # Counter controls and buttons
             apply(vbox.append).foreach(
-                # Counter controls
+                # Count label
                 build(
-                    Gtk.Box(
-                        orientation=Gtk.Orientation.HORIZONTAL,
-                        spacing=12,
-                        halign=Gtk.Align.CENTER,
+                    Gtk.Label(
+                        css_classes=["title-2"],
+                        margin_start=12,
+                        margin_end=12,
                         valign=Gtk.Align.CENTER,
                     ),
-                    lambda hbox: apply(hbox.append).foreach(
-                        # Decrement button
-                        build(
-                            Gtk.Button(
-                                icon_name="list-remove-symbolic",
-                                css_classes=["circular"],
-                                valign=Gtk.Align.CENTER,
-                            ),
-                            lambda dec_button: do(
-                                dec_button.connect("clicked", lambda *_: model.count.update(lambda x: x - 1))
-                            ),
-                        ),
-                        # Count label
-                        build(
-                            Gtk.Label(
-                                css_classes=["title-2"],
-                                margin_start=12,
-                                margin_end=12,
-                                valign=Gtk.Align.CENTER,
-                            ),
-                            lambda count_label: model.count.map(str).bind(count_label, "label"),
-                        ),
-                        # Increment button
-                        build(
-                            Gtk.Button(
-                                icon_name="list-add-symbolic",
-                                css_classes=["circular"],
-                                valign=Gtk.Align.CENTER,
-                            ),
-                            lambda inc_button: do(
-                                inc_button.connect("clicked", lambda *_: model.count.update(lambda x: x + 1))
-                            ),
-                        ),
-                    ),
+                    lambda count_label: model.count.map(str).bind(count_label, "label"),
                 ),
                 # Reset button
                 build(
                     Gtk.Button(label="Reset", css_classes=["destructive-action"]),
-                    lambda reset_button: reset_button.connect("clicked", lambda *_: model.count.set(0)),
+                    lambda reset_button: reset_button.connect(
+                        "clicked", lambda *_: model.count.set(0)
+                    ),
                 ),
                 # Auto-increment toggle
                 build(
                     Gtk.Button(),
                     lambda auto_button: do(
-                        auto_button.connect("clicked", lambda *_: model.auto_increment.update(lambda x: not x)),
+                        auto_button.connect(
+                            "clicked", lambda *_: model.auto_increment.update(lambda x: not x)
+                        ),
                         model.auto_increment.map(
                             lambda auto: "Stop Auto-increment" if auto else "Start Auto-increment"
                         ).bind(auto_button, "label"),
@@ -116,7 +85,9 @@ def CounterWidget(
                         css_classes=["destructive-action"],
                         halign=Gtk.Align.CENTER,
                     ),
-                    lambda remove_button: remove_button.connect("clicked", lambda *_: on_remove(model)),
+                    lambda remove_button: remove_button.connect(
+                        "clicked", lambda *_: on_remove(model)
+                    ),
                 ),
             ),
         ),
@@ -211,7 +182,9 @@ def CounterWindow(event_loop: asyncio.AbstractEventLoop) -> Adw.ApplicationWindo
                         lambda header_bar: header_bar.pack_start(
                             build(
                                 Gtk.Button(label="Add Counter", css_classes=["suggested-action"]),
-                                lambda add_button: do(add_button.connect("clicked", lambda *_: add_counter())),
+                                lambda add_button: do(
+                                    add_button.connect("clicked", lambda *_: add_counter())
+                                ),
                             ),
                         ),
                     ),
