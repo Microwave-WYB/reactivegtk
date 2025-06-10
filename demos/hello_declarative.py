@@ -40,7 +40,11 @@ def App():
 
     @partial(app.connect, "activate")
     def _(*_):
-        window = Adw.ApplicationWindow(application=app, title="Hello ReactiveGTK (Declarative)", content=HelloWorld())
+        window = Adw.ApplicationWindow(
+            application=app,
+            title="Hello ReactiveGTK (Declarative)",
+            content=HelloWorld(),
+        )
         window.present()
 
     return app
