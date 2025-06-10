@@ -19,7 +19,7 @@ def HelloWorld():
         valign=Gtk.Align.CENTER,
     )
 
-    @apply(box.append).foreach
+    @apply(box.append)
     def _():
         entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
         name.twoway_bind(entry, "text")
@@ -27,11 +27,14 @@ def HelloWorld():
             "activate",
             lambda: print(f"Entry activated with text: {name.value}"),
         )
+        return entry
 
+    @apply(box.append)
+    def _():
         label = Gtk.Label(css_classes=["title-1"])
         name.map(lambda x: f"Hello, {x or '...'}!").bind(label, "label")
 
-        return (entry, label)
+        return label
 
 
 # Create and run the app
