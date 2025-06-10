@@ -21,9 +21,19 @@ def do(*_: Any, ret: T = None) -> T:
     """
     Allow eager execution of actions, return ret if provided.
 
-    >>> do(print("Hello"), ret=42)
+    >>> do(
+    ...     print("Hello"),
+    ...     ret=42,
+    ... )
     Hello
     42
+
+    >>> do(
+    ...    num1 := max(1, 2),
+    ...    num2 := min(3, 4),
+    ...    ret=num1 + num2,
+    ... )
+    5
     """
     return ret
 
