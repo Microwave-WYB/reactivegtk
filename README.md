@@ -32,7 +32,7 @@ See the progression from traditional GTK to ReactiveGTK's declarative approach:
 
 Classic GTK widget development with manual state management:
 
-```reactivegtk/demos/hello_traditional.py#L1-48
+```python
 import gi
 
 gi.require_versions({"Gtk": "4.0", "Adw": "1"})
@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
 Using ReactiveGTK's state management but keeping imperative structure:
 
-```reactivegtk/demos/hello_imperative.py#L1-54
+```python
 import gi
 
 from reactivegtk import MutableState
@@ -167,7 +167,7 @@ The same application built with ReactiveGTK's declarative DSL:
 
 ![Hello World Demo](assets/hello.gif)
 
-```reactivegtk/demos/hello_declarative.py#L1-57
+```python
 import gi
 
 from reactivegtk import MutableState
@@ -340,7 +340,7 @@ from reactivegtk.dsl import build, do, apply
 
 def MyComponent():
     count = MutableState(0)
-    
+
     return build(
         Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12),
         lambda box: do(
@@ -353,7 +353,7 @@ def MyComponent():
                 build(
                     Gtk.Button(label="Increment"),
                     lambda button: button.connect(
-                        "clicked", 
+                        "clicked",
                         lambda *_: count.update(lambda x: x + 1)
                     )
                 )
@@ -414,17 +414,17 @@ def Counter():
     event_loop, _ = start_event_loop()
     count = MutableState(0)
     auto_enabled = MutableState(False)
-    
+
     # Auto-increment effect
     @effect(event_loop)
     async def auto_increment():
         while auto_enabled.value:
             await asyncio.sleep(1)
             count.update(lambda x: x + 1)
-    
+
     # Restart effect when auto_enabled changes
     auto_enabled.watch(lambda _: auto_increment())
-    
+
     return build(
         Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12),
         lambda box: apply(box.append).foreach(
@@ -439,7 +439,7 @@ def Counter():
                         lambda enabled: "Stop" if enabled else "Start Auto"
                     ).bind(button, "label"),
                     button.connect(
-                        "clicked", 
+                        "clicked",
                         lambda *_: auto_enabled.update(lambda x: not x)
                     )
                 )
