@@ -36,6 +36,8 @@ def HelloWorld():
 
         return label
 
+    return box
+
 
 # Create and run the app
 def App():
