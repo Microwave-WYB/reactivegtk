@@ -192,18 +192,18 @@ def HelloWorld():
     def _():
         entry = Gtk.Entry(placeholder_text="Enter your name...", width_request=200)
         name.twoway_bind(entry, "text")
-        
+
         @partial(entry.connect, "activate")
         def _(*_):
             print(f"Entry activated with text: {name.value}")
             print("Multiple prints are possible with multiple statements")
-        
+
         return entry
 
     @apply(box.append)
     def _():
         label = Gtk.Label(css_classes=["title-1"])
-        name.map(lambda x: f"Hello, {x}!" if x else "Hello, ...!").bind(label, "label")
+        name.map(lambda x: f"Hello, {x or '...'}!").bind(label, "label")
         return label
 
     return box
@@ -309,50 +309,50 @@ event_loop, thread = start_event_loop()
 def AutoIncrementingCounter():
     count = MutableState(0)
     auto_enabled = MutableState(False)
-    
+
     # Auto-increment effect
     @effect(event_loop)
     async def auto_increment_effect(enabled: bool):
         while enabled:
             await asyncio.sleep(1)
             count.update(lambda x: x + 1)
-    
+
     # Watch state changes and pass value to effect
     @auto_enabled.watch
     def _(enabled):
         auto_increment_effect(enabled)
-    
+
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
-    
+
     @apply(box.append)
     def _():
         label = Gtk.Label(css_classes=["title-1"])
         count.map(lambda x: f"Count: {x}").bind(label, "label")
         return label
-    
+
     @apply(box.append)
     def _():
         button = Gtk.Button(label="Reset")
-        
+
         @partial(button.connect, "clicked")
         def _(*_):
             count.set(0)
-        
+
         return button
-    
+
     @apply(box.append)
     def _():
         button = Gtk.Button()
         auto_enabled.map(
             lambda enabled: "Stop Auto-increment" if enabled else "Start Auto-increment"
         ).bind(button, "label")
-        
+
         @partial(button.connect, "clicked")
         def _(*_):
             auto_enabled.update(lambda x: not x)
-        
+
         return button
-    
+
     return box
 ```
 
@@ -374,11 +374,11 @@ box = Gtk.Box()
 @apply(box.append)
 def _():
     button = Gtk.Button(label="Click me")
-    
+
     @partial(button.connect, "clicked")
     def _(*_):
         print("Clicked!")
-    
+
     return button
 ```
 
@@ -392,7 +392,7 @@ Apply a function to multiple similar items:
 def _():
     return (
         Gtk.Label(label="First"),
-        Gtk.Label(label="Second"), 
+        Gtk.Label(label="Second"),
         Gtk.Button(label="Third")
     )
 
@@ -436,7 +436,7 @@ def _():
     return (
         (Gtk.Button(label="Clear"), 0, 0, 3, 1),  # spans 3 columns
         (Gtk.Button(label="7"), 0, 1, 1, 1),
-        (Gtk.Button(label="8"), 1, 1, 1, 1), 
+        (Gtk.Button(label="8"), 1, 1, 1, 1),
         (Gtk.Button(label="9"), 2, 1, 1, 1),
         (Gtk.Button(label="÷"), 3, 1, 1, 1),
         # ... more buttons
