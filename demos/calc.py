@@ -1,8 +1,10 @@
-from typing import Callable, Optional
+from dataclasses import dataclass, replace
+from enum import Enum, auto
+from typing import Callable, Final, Literal, Optional
 
 import gi
 
-from reactivegtk import MutableState, Preview, apply
+from reactivegtk import MutableState, Preview, apply, State
 
 gi.require_versions(
     {
@@ -15,86 +17,97 @@ gi.require_versions(
 from gi.repository import Adw, Gdk, Gtk, Pango  # type: ignore # noqa: E402
 
 
+@dataclass(frozen=True)
+class Digit:
+    value: int
+
+
+@dataclass(frozen=True)
+class Operator:
+    symbol: Literal["+", "-", "*", "/"]
+
+
+class Control(Enum):
+    CLEAR = auto()
+    BACKSPACE = auto()
+    EVAL = auto()
+    DECIMAL = auto()
+
+
+CalculatorAction = Digit | Operator | Control
+
+ERROR: Final[str] = "Error!"
+
+
+@dataclass(frozen=True)
+class CalculatorState:
+    current_expression: str = "0"
+    result: str = "0"
+    error: bool = False
+
+    def sync_result(self) -> "CalculatorState":
+        try:
+            result = eval(self.current_expression)
+            return replace(self, result=str(result), error=False)
+        except Exception:
+            return self
+
+    def update(self, action: CalculatorAction) -> "CalculatorState":
+        match action:
+            case Digit(value):
+                match self.current_expression:
+                    case "0":
+                        new_expression = str(value)
+                    case _:
+                        new_expression = self.current_expression + str(value)
+                return replace(self, current_expression=new_expression).sync_result()
+
+            case Operator(symbol):
+                match symbol:
+                    case "-":
+                        if self.current_expression == "0":
+                            return replace(self, current_expression="-")
+                        return replace(self, current_expression=self.current_expression + symbol)
+                    case _:
+                        return replace(self, current_expression=self.current_expression + symbol)
+
+            case Control.CLEAR:
+                return CalculatorState()
+
+            case Control.BACKSPACE:
+                return replace(
+                    self,
+                    current_expression=self.current_expression[:-1] if self.current_expression else "",
+                ).sync_result()
+
+            case Control.DECIMAL:
+                match self.current_expression[-1]:
+                    case ".":
+                        return self
+                    case operator if not operator.isdigit():
+                        return replace(self, current_expression=self.current_expression + "0.")
+                    case _:
+                        return replace(self, current_expression=self.current_expression + ".")
+
+            case Control.EVAL:
+                try:
+                    result = eval(self.current_expression)
+                    return replace(self, current_expression=str(result), result=str(result), error=False)
+                except Exception:
+                    return replace(self, current_expression=self.current_expression, result=ERROR, error=True)
+
+
 class CalculatorViewModel:
     def __init__(self):
-        self.current_expression = MutableState("")
-        self.result = MutableState("0")
-        self.has_error = MutableState(False)
-        self.just_evaluated = MutableState(False)
+        self._state = MutableState(CalculatorState())
 
-    def append_digit(self, digit: str) -> None:
-        if self.has_error.value:
-            self.clear()
+    @property
+    def state(self) -> State[CalculatorState]:
+        return self._state
 
-        if self.just_evaluated.value:
-            self.current_expression.set(digit)
-            self.just_evaluated.set(False)
-        else:
-            self.current_expression.update(lambda expr: expr + digit)
-
-    def append_operator(self, operator: str) -> None:
-        if self.has_error.value:
-            self.clear()
-
-        if self.just_evaluated.value:
-            self.just_evaluated.set(False)
-
-        current = self.current_expression.value
-
-        # Allow minus sign at the beginning for negative numbers
-        if operator == "-" and not current:
-            self.current_expression.update(lambda expr: expr + operator)
-        elif current and current[-1] not in "+-*/":
-            self.current_expression.update(lambda expr: expr + operator)
-
-    def append_decimal(self) -> None:
-        if self.has_error.value:
-            self.clear()
-
-        if self.just_evaluated.value:
-            self.current_expression.set("0.")
-            self.just_evaluated.set(False)
-            return
-
-        current = self.current_expression.value
-
-        parts = current.replace("+", "|").replace("-", "|").replace("*", "|").replace("/", "|").split("|")
-        if parts and "." not in parts[-1]:
-            if not current or current[-1] in "+-*/":
-                self.current_expression.update(lambda expr: expr + "0.")
-            else:
-                self.current_expression.update(lambda expr: expr + ".")
-
-    def clear(self) -> None:
-        self.current_expression.set("")
-        self.result.set("0")
-        self.has_error.set(False)
-        self.just_evaluated.set(False)
-
-    def backspace(self) -> None:
-        if self.has_error.value:
-            self.clear()
-            return
-
-        if self.just_evaluated.value:
-            self.clear()
-            return
-
-        self.current_expression.update(lambda expr: expr[:-1] if expr else "")
-
-    def calculate(self) -> None:
-        try:
-            expr = self.current_expression.value
-            if expr:
-                result = eval(expr)
-                self.result.set(str(result))
-                self.current_expression.set(str(result))
-                self.has_error.set(False)
-                self.just_evaluated.set(True)
-        except Exception:
-            self.result.set("Error!")
-            self.has_error.set(True)
-            self.just_evaluated.set(False)
+    def enter(self, action: CalculatorAction) -> None:
+        """Perform an action on the calculator state."""
+        self._state.update(lambda state: state.update(action))
 
 
 def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
@@ -118,7 +131,7 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
                 halign=Gtk.Align.END,
                 ellipsize=Pango.EllipsizeMode.END,
             )
-            view_model.current_expression.map(lambda expr: expr or "0").bind(expression_label, "label")
+            view_model.state.map(lambda state: state.current_expression).bind(expression_label, "label")
             return expression_label
 
         @apply(box.append)
@@ -129,13 +142,16 @@ def ResultsDisplay(view_model: CalculatorViewModel) -> Gtk.WindowHandle:
                 css_classes=["title-1"],
                 ellipsize=Pango.EllipsizeMode.END,
             )
-            view_model.result.bind(result_label, "label")
-            @view_model.has_error.watch
+            # view_model.result.bind(result_label, "label")
+            view_model.state.map(lambda state: state.result).bind(result_label, "label")
+
+            @view_model.state.map(lambda state: state.error).watch
             def _(has_error):
                 if has_error:
                     result_label.add_css_class("error")
                 else:
                     result_label.remove_css_class("error")
+
             return result_label
 
         return box
@@ -188,59 +204,59 @@ def Keypad(view_model: CalculatorViewModel) -> Gtk.Grid:
     def _():
         return (
             # Row 0: Clear and backspace
-            (CalcButton("C", view_model.clear, ["destructive-action"]), 0, 0, 3, 1),
+            (CalcButton("C", lambda: view_model.enter(Control.CLEAR), ["destructive-action"]), 0, 0, 3, 1),
             (
-                CalcButton("edit-clear-symbolic", view_model.backspace, ["flat"], icon=True),
+                CalcButton("edit-clear-symbolic", lambda: view_model.enter(Control.BACKSPACE), ["flat"], icon=True),
                 3,
                 0,
                 1,
                 1,
             ),
             # Row 1: 7, 8, 9, /
-            (CalcButton("7", lambda: view_model.append_digit("7")), 0, 1, 1, 1),
-            (CalcButton("8", lambda: view_model.append_digit("8")), 1, 1, 1, 1),
-            (CalcButton("9", lambda: view_model.append_digit("9")), 2, 1, 1, 1),
+            (CalcButton("7", lambda: view_model.enter(Digit(7))), 0, 1, 1, 1),
+            (CalcButton("8", lambda: view_model.enter(Digit(8))), 1, 1, 1, 1),
+            (CalcButton("9", lambda: view_model.enter(Digit(9))), 2, 1, 1, 1),
             (
-                CalcButton("÷", lambda: view_model.append_operator("/"), ["suggested-action"]),
+                CalcButton("÷", lambda: view_model.enter(Operator("/")), ["suggested-action"]),
                 3,
                 1,
                 1,
                 1,
             ),
             # Row 2: 4, 5, 6, *
-            (CalcButton("4", lambda: view_model.append_digit("4")), 0, 2, 1, 1),
-            (CalcButton("5", lambda: view_model.append_digit("5")), 1, 2, 1, 1),
-            (CalcButton("6", lambda: view_model.append_digit("6")), 2, 2, 1, 1),
+            (CalcButton("4", lambda: view_model.enter(Digit(4))), 0, 2, 1, 1),
+            (CalcButton("5", lambda: view_model.enter(Digit(5))), 1, 2, 1, 1),
+            (CalcButton("6", lambda: view_model.enter(Digit(6))), 2, 2, 1, 1),
             (
-                CalcButton("×", lambda: view_model.append_operator("*"), ["suggested-action"]),
+                CalcButton("×", lambda: view_model.enter(Operator("*")), ["suggested-action"]),
                 3,
                 2,
                 1,
                 1,
             ),
             # Row 3: 1, 2, 3, -
-            (CalcButton("1", lambda: view_model.append_digit("1")), 0, 3, 1, 1),
-            (CalcButton("2", lambda: view_model.append_digit("2")), 1, 3, 1, 1),
-            (CalcButton("3", lambda: view_model.append_digit("3")), 2, 3, 1, 1),
+            (CalcButton("1", lambda: view_model.enter(Digit(1))), 0, 3, 1, 1),
+            (CalcButton("2", lambda: view_model.enter(Digit(2))), 1, 3, 1, 1),
+            (CalcButton("3", lambda: view_model.enter(Digit(3))), 2, 3, 1, 1),
             (
-                CalcButton("−", lambda: view_model.append_operator("-"), ["suggested-action"]),
+                CalcButton("−", lambda: view_model.enter(Operator("-")), ["suggested-action"]),
                 3,
                 3,
                 1,
                 1,
             ),
             # Row 4: 0, ., +
-            (CalcButton("0", lambda: view_model.append_digit("0")), 0, 4, 2, 1),
-            (CalcButton(".", view_model.append_decimal), 2, 4, 1, 1),
+            (CalcButton("0", lambda: view_model.enter(Digit(0))), 0, 4, 2, 1),
+            (CalcButton(".", lambda: view_model.enter(Control.DECIMAL)), 2, 4, 1, 1),
             (
-                CalcButton("+", lambda: view_model.append_operator("+"), ["suggested-action"]),
+                CalcButton("+", lambda: view_model.enter(Operator("+")), ["suggested-action"]),
                 3,
                 4,
                 1,
                 1,
             ),
             # Row 5: Equals
-            (CalcButton("=", view_model.calculate, ["suggested-action"]), 0, 5, 4, 1),
+            (CalcButton("=", lambda: view_model.enter(Control.EVAL), ["suggested-action"]), 0, 5, 4, 1),
         )
 
     return grid
@@ -275,42 +291,69 @@ def CalculatorWindow() -> Adw.Window:
 
         match key_name:
             # Handle digit keys
-            case "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9":
-                view_model.append_digit(key_name)
+            case "0":
+                view_model.enter(Digit(0))
+                return True
+            case "1":
+                view_model.enter(Digit(1))
+                return True
+            case "2":
+                view_model.enter(Digit(2))
+                return True
+            case "3":
+                view_model.enter(Digit(3))
+                return True
+            case "4":
+                view_model.enter(Digit(4))
+                return True
+            case "5":
+                view_model.enter(Digit(5))
+                return True
+            case "6":
+                view_model.enter(Digit(6))
+                return True
+            case "7":
+                view_model.enter(Digit(7))
+                return True
+            case "8":
+                view_model.enter(Digit(8))
+                return True
+            case "9":
+                view_model.enter(Digit(9))
                 return True
 
             # Handle operators
             case "plus" | "KP_Add":
-                view_model.append_operator("+")
+                view_model.enter(Operator("+"))
                 return True
             case "minus" | "KP_Subtract":
-                view_model.append_operator("-")
+                view_model.enter(Operator("-"))
                 return True
             case "asterisk" | "KP_Multiply":
-                view_model.append_operator("*")
+                view_model.enter(Operator("*"))
                 return True
             case "slash" | "KP_Divide":
-                view_model.append_operator("/")
+                view_model.enter(Operator("/"))
                 return True
 
             # Handle decimal point
             case "period" | "KP_Decimal":
-                view_model.append_decimal()
+                view_model.enter(Control.DECIMAL)
                 return True
 
             # Handle equals/enter
             case "equal" | "Return" | "KP_Enter":
-                view_model.calculate()
+                view_model.enter(Control.EVAL)
                 return True
 
             # Handle backspace
             case "BackSpace":
-                view_model.backspace()
+                view_model.enter(Control.BACKSPACE)
                 return True
 
             # Handle clear (Escape or Delete)
             case "Escape" | "Delete":
-                view_model.clear()
+                view_model.enter(Control.CLEAR)
                 return True
 
             # Default case for unhandled keys
@@ -355,8 +398,7 @@ if __name__ == "__main__":
     @preview("ResultsDisplay")
     def _(_) -> Gtk.Widget:
         view_model = CalculatorViewModel()
-        view_model.current_expression.set("2+3*4")
-        view_model.result.set("14")
+        view_model._state.set(CalculatorState(current_expression="2+3*4", result="14", error=False))
 
         return Gtk.Overlay(
             width_request=300,
@@ -366,9 +408,7 @@ if __name__ == "__main__":
     @preview("ResultsDisplay with Error")
     def _(_) -> Gtk.Widget:
         view_model = CalculatorViewModel()
-        view_model.current_expression.set("2+3*")
-        view_model.result.set("Error!")
-        view_model.has_error.set(True)
+        view_model._state.set(CalculatorState(current_expression="2+3*", result="Error!", error=True))
 
         return Gtk.Overlay(
             width_request=300,
