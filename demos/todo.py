@@ -188,13 +188,12 @@ def TodoView(view_model: TodoViewModel) -> Gtk.Widget:
                 css_classes=["linked"],
             )
 
-            @apply(entry_box.append)
+            @apply(entry_box.append).foreach
             def _():
-                return TaskEntry(view_model)
-
-            @apply(entry_box.append)
-            def _():
-                return TaskAddButton(view_model)
+                return (
+                    TaskEntry(view_model),
+                    TaskAddButton(view_model),
+                )
 
             return entry_box
 
