@@ -51,9 +51,13 @@ class CalculatorState:
         return self.current_expression[-1]
 
     def sync_result(self) -> "CalculatorState":
-        return attempt(
-            lambda: replace(self, result=str(eval(self.current_expression)), error=False),
-        ).orelse(self)
+        return (
+            attempt(
+                lambda: replace(self, result=str(eval(self.current_expression)), error=False),
+            )
+            .catch(SyntaxError)
+            .fallback(self)
+        )
 
     def update(self, action: CalculatorAction) -> "CalculatorState":
         match action:

@@ -87,64 +87,57 @@ class apply(Generic[T]):
 
 
 P = ParamSpec("P")
+E = TypeVar("E", bound=type[Exception])
+
+
+class catcher(Generic[P, T, E]):
+    def __init__(
+        self,
+        _exc_type: E,
+        fn: Callable[P, T],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> None:
+        self.exc_type = _exc_type
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+    def fallback(self, value: T) -> T:
+        try:
+            return self.fn(*self.args, **self.kwargs)
+        except self.exc_type:
+            return value
+
+    def recover(self, handler: Callable[[E], T]) -> T:
+        try:
+            return self.fn(*self.args, **self.kwargs)
+        except self.exc_type as e:
+            return handler(e)
 
 
 class attempt(Generic[P, T]):
     def __init__(self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> None:
-        """
-        Attempt to call a function and return its result or None if it fails.
-
-        >>> def divide(a: int, b: int) -> float:
-        ...     return a / b
-
-        >>> @attempt(divide, 10, 2)
-        ... def _() -> float:
-        ...     return 5.0
-        >>> _()
-        5.0
-
-        >>> @attempt(divide, 10, 0)
-        ... def _() -> float:
-        ...     return None
-        >>> _() is None
-        True
-        """
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
 
     def __call__(self) -> T:
+        """
+        >>> attempt(lambda: 1 / 0)()
+        Traceback (most recent call last):
+        ...
+        ZeroDivisionError: division by zero
+        """
         return self.fn(*self.args, **self.kwargs)
 
-    def orelse(self, fallback: T) -> T:
+    def catch(self, exc_type: E) -> catcher[P, T, E]:
         """
-        Return the result of the function or a fallback value if it fails.
+        Catch specific exceptions and handle them.
 
-        >>> @attempt(divide, 10, 0).orelse(0.0)
-        ... def _() -> float:
-        ...     return 0.0
-        >>> _()
-        0.0
+        >>> attempt(lambda: 1 / 0).catch(ZeroDivisionError).orelse(-1)
+        -1
+        >>> attempt(lambda: 1 / 0).catch(ZeroDivisionError).recover(lambda e: -1)
+        -1
         """
-        try:
-            return self.fn(*self.args, **self.kwargs)
-        except Exception:
-            return fallback
-
-    def catch(self, handler: Callable[[Exception], T | Exception]) -> T:
-        """
-        Call a handler function if the original function raises an exception.
-
-        >>> @attempt(divide, 10, 0).catch(lambda e: -1.0)
-        ... def _() -> float:
-        ...     return -1.0
-        >>> _()
-        -1.0
-        """
-        try:
-            return self.fn(*self.args, **self.kwargs)
-        except Exception as e:
-            result = handler(e)
-            if isinstance(result, Exception):
-                raise result
-            return result
+        return catcher(exc_type, self.fn, *self.args, **self.kwargs)
