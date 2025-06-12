@@ -302,35 +302,8 @@ def CalculatorWindow() -> Adw.Window:
 
         match key_name:
             # Handle digit keys
-            case "0":
-                view_model.enter(Digit(0))
-                return True
-            case "1":
-                view_model.enter(Digit(1))
-                return True
-            case "2":
-                view_model.enter(Digit(2))
-                return True
-            case "3":
-                view_model.enter(Digit(3))
-                return True
-            case "4":
-                view_model.enter(Digit(4))
-                return True
-            case "5":
-                view_model.enter(Digit(5))
-                return True
-            case "6":
-                view_model.enter(Digit(6))
-                return True
-            case "7":
-                view_model.enter(Digit(7))
-                return True
-            case "8":
-                view_model.enter(Digit(8))
-                return True
-            case "9":
-                view_model.enter(Digit(9))
+            case "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9":
+                view_model.enter(Digit(int(key_name)))
                 return True
 
             # Handle operators
