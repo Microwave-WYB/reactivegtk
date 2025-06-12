@@ -41,7 +41,7 @@ ERROR: Final[str] = "Error!"
 
 
 @dataclass(frozen=True)
-class CalculatorState:
+class CalculatorModel:
     current_expression: str = "0"
     result: str = "0"
     error: bool = False
@@ -50,7 +50,7 @@ class CalculatorState:
     def last_char(self) -> str:
         return self.current_expression[-1]
 
-    def sync_result(self) -> "CalculatorState":
+    def sync_result(self) -> "CalculatorModel":
         return (
             attempt(
                 lambda: replace(self, result=str(eval(self.current_expression)), error=False),
@@ -59,7 +59,7 @@ class CalculatorState:
             .fallback(self)
         )
 
-    def update(self, action: CalculatorAction) -> "CalculatorState":
+    def update(self, action: CalculatorAction) -> "CalculatorModel":
         match action:
             case Digit(value):
                 match self.current_expression:
@@ -81,11 +81,11 @@ class CalculatorState:
                 ).sync_result()
 
             case Control.CLEAR:
-                return CalculatorState()
+                return CalculatorModel()
 
             case Control.BACKSPACE:
                 if len(self.current_expression) == 1:
-                    return CalculatorState()
+                    return CalculatorModel()
                 return replace(
                     self,
                     current_expression=self.current_expression[:-1],
@@ -110,10 +110,10 @@ class CalculatorState:
 
 class CalculatorViewModel:
     def __init__(self):
-        self._state = MutableState(CalculatorState())
+        self._state = MutableState(CalculatorModel())
 
     @property
-    def state(self) -> State[CalculatorState]:
+    def state(self) -> State[CalculatorModel]:
         return self._state
 
     def enter(self, action: CalculatorAction) -> None:
@@ -409,7 +409,7 @@ if __name__ == "__main__":
     @preview("ResultsDisplay")
     def _(_) -> Gtk.Widget:
         view_model = CalculatorViewModel()
-        view_model._state.set(CalculatorState(current_expression="2+3*4", result="14", error=False))
+        view_model._state.set(CalculatorModel(current_expression="2+3*4", result="14", error=False))
 
         return Gtk.Overlay(
             width_request=300,
@@ -419,7 +419,7 @@ if __name__ == "__main__":
     @preview("ResultsDisplay with Error")
     def _(_) -> Gtk.Widget:
         view_model = CalculatorViewModel()
-        view_model._state.set(CalculatorState(current_expression="2+3*", result="Error!", error=True))
+        view_model._state.set(CalculatorModel(current_expression="2+3*", result="Error!", error=True))
 
         return Gtk.Overlay(
             width_request=300,
